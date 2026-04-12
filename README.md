@@ -8,8 +8,8 @@ This repo coordinates all services: shared documentation, common configurations,
 
 ```bash
 # Clone coordinator
-git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coodinator.git
-cd swarmex-coodinator
+git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
+cd swarmex-coordinator
 
 # Clone all sub-repos (each is independent)
 ./scripts/clone-all.sh
@@ -18,7 +18,7 @@ cd swarmex-coodinator
 ## Project Structure
 
 ```
-swarmex-coodinator/
+swarmex-coordinator/
 ├── README.md              # This file
 ├── ROADMAP.md             # Detailed phases with resources
 ├── SWARMEX.md             # Original vision document
