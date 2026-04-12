@@ -1,0 +1,77 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+REMOTE.md
+
+# AI agents & copilot
+AGENTS.md
+.github/copilot-instructions.md
+.github/copilot*.md
+.copilot/
+.kiro/
+.cursor/
+.aider*
+.continue/
+.cline/
+.roo/
+.windsurf/
+.augment*
+codex.md
+claude.md
+CLAUDE.md
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+.eggs/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+
+# Go
+/vendor/
+*.exe
+*.test
+*.out
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+tmp/
+.cache/
+*.tmp
+*.bak
+*.orig
+
+# Docker (local)
+docker-compose.override.yml
+
+# Databases (local)
+*.sqlite3
+*.db
