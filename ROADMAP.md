@@ -90,15 +90,15 @@ Docker Socket (/var/run/docker.sock)
 
 | Repo | Type | Status |
 |:---|:---|:---|
-| `swarmex-coordinator` | Docs/coordination | Created |
-| `swarmex-event-controller` | Shared library | To create |
-| `swarmex-scaler` | Custom service | To create |
-| `swarmex-gatekeeper` | Custom service | To create |
-| `swarmex-operator-db` | Custom service | To create |
-| `swarmex-vault-sync` | Custom service | To create |
-| `swarmex-nano-mesh` | Custom service | To create |
-| `swarmex-remediation` | Custom service | To create |
-| `swarmex-deployer` | Custom service | To create |
+| `swarmex-coordinator` | Docs/coordination | ✅ Complete |
+| `swarmex-event-controller` | Shared library | ✅ Built (Go, 12MB) |
+| `swarmex-scaler` | Custom service | ✅ Built (Go, 8.1MB) |
+| `swarmex-gatekeeper` | Custom service | ✅ Built (Go, 8.1MB) |
+| `swarmex-operator-db` | Custom service | ✅ Built (Go, 8.1MB) |
+| `swarmex-vault-sync` | Custom service | ✅ Built (Go, 8.0MB) |
+| `swarmex-nano-mesh` | Custom service | ✅ Built (Go, 8.1MB) |
+| `swarmex-remediation` | Custom service | ✅ Built (Go, 8.2MB) |
+| `swarmex-deployer` | Custom service | ✅ Built (Go, 8.1MB) |
 
 ---
 
@@ -189,9 +189,9 @@ Existing tools that complement the custom services.
 
 ### Build (custom)
 
-- [ ] Create `swarmex-event-controller` repo — base event stream library
-- [ ] Implement Docker socket connection, event filtering, handler dispatch
-- [ ] Unit tests with mock Docker events
+- [x] Create `swarmex-event-controller` repo — base event stream library
+- [x] Implement Docker socket connection, event filtering, handler dispatch
+- [x] Unit tests with mock Docker events
 
 ---
 
@@ -207,10 +207,10 @@ Existing tools that complement the custom services.
 
 ### Build (custom)
 
-- [ ] Create `swarmex-gatekeeper` repo
-- [ ] Implement: listen Docker socket → detect container health events → toggle Traefik labels
-- [ ] L7 readiness probes: HTTP 200 check before allowing Traefik to route
-- [ ] Integration tests with Traefik + mock unhealthy containers
+- [x] Create `swarmex-gatekeeper` repo
+- [x] Implement: listen Docker socket → detect container health events → toggle Traefik labels
+- [x] L7 readiness probes: HTTP 200 check before allowing Traefik to route
+- [x] Integration tests with Traefik + mock unhealthy containers
 
 ---
 
@@ -226,13 +226,13 @@ Existing tools that complement the custom services.
 
 ### Build (custom)
 
-- [ ] Create `swarmex-scaler` repo
-- [ ] Implement: query Prometheus → compare thresholds → `docker service update --replicas`
-- [ ] Support CPU, RAM, latency metrics (not just CPU like existing tools)
-- [ ] Configurable via Docker labels: `swarmex.scaler.min=2`, `swarmex.scaler.max=10`, `swarmex.scaler.cpu-target=70`
-- [ ] Cooldown periods to prevent flapping
-- [ ] Create `swarmex-remediation` repo
-- [ ] Implement: detect persistent healthcheck failures → auto-restart tasks → purge caches → escalate to node drain
+- [x] Create `swarmex-scaler` repo
+- [x] Implement: query Prometheus → compare thresholds → `docker service update --replicas`
+- [x] Support CPU, RAM, latency metrics (not just CPU like existing tools)
+- [x] Configurable via Docker labels: `swarmex.scaler.min=2`, `swarmex.scaler.max=10`, `swarmex.scaler.cpu-target=70`
+- [x] Cooldown periods to prevent flapping
+- [x] Create `swarmex-remediation` repo
+- [x] Implement: detect persistent healthcheck failures → auto-restart tasks → purge caches → escalate to node drain
 
 ---
 
@@ -249,14 +249,14 @@ Existing tools that complement the custom services.
 
 ### Build (custom)
 
-- [ ] Create `swarmex-operator-db` repo
-- [ ] Implement: reconciliation loops for PostgreSQL/MySQL quorum, automated failover, backup scheduling, volume migration
-- [ ] Create `swarmex-vault-sync` repo
-- [ ] Implement: read OpenBao secrets → inject tmpfs `/run/secrets/` → watch rotation → hot-reload
-- [ ] Create `swarmex-deployer` repo
-- [ ] Implement: blue/green controller → create parallel service → shift Traefik weights → rollback on failure
-- [ ] Create `swarmex-nano-mesh` repo
-- [ ] Implement: auto-discover services via Docker events → provision WireGuard tunnels → manage peer configs → mTLS-equivalent encryption
+- [x] Create `swarmex-operator-db` repo
+- [x] Implement: reconciliation loops for PostgreSQL/MySQL quorum, automated failover, backup scheduling, volume migration
+- [x] Create `swarmex-vault-sync` repo
+- [x] Implement: read OpenBao secrets → inject tmpfs `/run/secrets/` → watch rotation → hot-reload
+- [x] Create `swarmex-deployer` repo
+- [x] Implement: blue/green controller → create parallel service → shift Traefik weights → rollback on failure
+- [x] Create `swarmex-nano-mesh` repo
+- [x] Implement: auto-discover services via Docker events → provision WireGuard tunnels → manage peer configs → mTLS-equivalent encryption
 
 ---
 

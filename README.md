@@ -42,18 +42,18 @@ swarmex-coordinator/
 
 ### Custom Services to Build (Go, Docker Engine SDK)
 
-All depend on `swarmex-event-controller` as shared base.
+All depend on `swarmex-event-controller` as shared base. **All 8 services are built, tested, and pushed.**
 
-| Repo | Issue | Purpose | Priority |
-|:---|:---|:---|:---|
-| `swarmex-event-controller` | #2 | Docker Event Stream listener, handler dispatch | `critical` |
-| `swarmex-scaler` | #3 | HPA autoscaling (CPU/RAM/latency via Prometheus) | `high` |
-| `swarmex-gatekeeper` | #4 | Readiness probes, Traefik label gating | `high` |
-| `swarmex-operator-db` | #5 | DB quorum, failover, backup, volume migration | `medium` |
-| `swarmex-vault-sync` | #6 | Secret injection from OpenBao, hot-reload | `medium` |
-| `swarmex-nano-mesh` | #7 | WireGuard tunnels between services | `medium` |
-| `swarmex-remediation` | #8 | Self-healing: retry, purge, drain escalation | `high` |
-| `swarmex-deployer` | #9 | Blue/green with Traefik traffic weights | `medium` |
+| Repo | Issue | Purpose | Binary | Status |
+|:---|:---|:---|:---|:---|
+| `swarmex-event-controller` | #2 | Docker Event Stream listener, handler dispatch | 12MB | ✅ |
+| `swarmex-scaler` | #3 | HPA autoscaling (CPU/RAM/latency via Prometheus) | 8.1MB | ✅ |
+| `swarmex-gatekeeper` | #4 | Readiness probes, Traefik label gating | 8.1MB | ✅ |
+| `swarmex-operator-db` | #5 | DB quorum, failover, backup, volume migration | 8.1MB | ✅ |
+| `swarmex-vault-sync` | #6 | Secret injection from OpenBao, hot-reload | 8.0MB | ✅ |
+| `swarmex-nano-mesh` | #7 | EasyTier wrapper for Docker auto-provisioning | 8.1MB | ✅ |
+| `swarmex-remediation` | #8 | Self-healing: retry, purge, drain escalation | 8.2MB | ✅ |
+| `swarmex-deployer` | #9 | Blue/green with Traefik traffic weights | 8.1MB | ✅ |
 
 ### Forked OSS Projects
 
