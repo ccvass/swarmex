@@ -3,6 +3,33 @@
 Detailed implementation plan with all open source resources mapped per phase.
 Every tool listed is OSS. When dual-licensed (CE/EE), we fork the community edition.
 
+## Fork Maturity Analysis
+
+Before building anything, we analyzed what the forked projects already solve.
+
+### Production-Ready (deploy directly, no custom build needed)
+
+| Fork | Lang | Commits | Version | What it solves | Impact |
+|:---|:---|:---|:---|:---|:---|
+| `swarm-cronjob` | Go | 509 | v1.15 | Cron jobs via labels + Docker API | No custom cron needed |
+| `gantry` | Shell | 479 | 36 releases | Auto-update services, rollback, webhooks, parallel | Replaces Shepherd |
+| `swarm-cd` | Go+TS | 65 | v1.10 | GitOps declarative (ArgoCD for Swarm), UI, SOPS | **Eliminates swarm-sync** |
+| `easytier` | Rust | 10.8K stars | v2.4.5 | Full WireGuard mesh, NAT traversal, subnet proxy, web UI | **Reduces #7 nano-mesh to wrapper** |
+
+### Useful Base (concept validated, code needs work)
+
+| Fork | Lang | Commits | What's useful | What's missing |
+|:---|:---|:---|:---|:---|
+| `swarm-autoscaler` | Ruby | 8 | Label pattern (`swarm.autoscaler.*`), Prometheus+cAdvisor approach | Full rewrite in Go, RAM/latency, configurable thresholds, cooldown |
+| `seaweedfs-swarm` | Shell | 16 | Compose stack for 3-node SeaweedFS with locality | Adapt to our cluster, add volume plugin, HA |
+
+### Reference Only (superseded or abandoned)
+
+| Fork | Reason | Action |
+|:---|:---|:---|
+| `swarm-sync` | Superseded by `swarm-cd` (more features, active, UI) | Keep as reference, use swarm-cd |
+| `hca` | 1 star, WIP since 2020, abandoned | API reference only |
+
 ## Custom Services to Build
 
 These are the core Swarmex services that **do not exist** and must be developed from scratch.
@@ -22,7 +49,7 @@ All are built on the **Docker Event Stream** pattern (section 5 of SWARMEX.md) u
 | **Traffic-Gatekeeper** | `swarmex-gatekeeper` | Go | Readiness Probes | Listens Docker socket events, performs L7 healthchecks (HTTP 200) on containers, activates/deactivates Traefik routing labels dynamically. Blocks traffic until app is truly ready. |
 | **Swarm-Operator-DB** | `swarmex-operator-db` | Go | Stateful Operators | Reconciliation loops for database lifecycle: quorum management (PostgreSQL, MySQL), automated failover on node/volume loss, backup scheduling, volume migration between nodes. |
 | **Vault-Sync-Sidecar** | `swarmex-vault-sync` | Go | Dynamic Secret Injection | Sidecar that reads secrets from OpenBao (Vault OSS fork), injects into container memory via tmpfs at `/run/secrets/`, watches for rotation events and hot-reloads without container restart. |
-| **Nano-Mesh** | `swarmex-nano-mesh` | Go | Lightweight Service Mesh | Automatic WireGuard tunnel provisioning between services. Provides mTLS-equivalent encryption on overlay networks. Auto-discovers services via Docker events, manages peer configs. |
+| **Nano-Mesh** | `swarmex-nano-mesh` | Go | Lightweight Service Mesh | EasyTier integration wrapper: listens Docker events, auto-provisions/deprovisions EasyTier peers per service. NOT building WireGuard from scratch. |
 
 ### Additional Controllers (SWARMEX.md Section 4)
 

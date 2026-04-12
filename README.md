@@ -59,19 +59,22 @@ All depend on `swarmex-event-controller` as shared base.
 
 Sorted by value to the project (activity, stars, relevance).
 
-#### Tier 1: Active and Critical
+#### Production-Ready (deploy directly, no custom build needed)
 
-These are actively maintained, high-star projects essential to the stack.
+| Repo | Source | Stars | Last Push | What it solves |
+|:---|:---|:---|:---|:---|
+| `swarm-cronjob` | `crazy-max/swarm-cronjob` | 868 | 2026-04-09 | ✅ Cron jobs via labels. Go, v1.15, 509 commits |
+| `gantry` | `shizunge/gantry` | 88 | 2026-04-12 | ✅ Auto-update services, rollback, webhooks. 36 releases |
+| `swarm-cd` | `m-adawi/swarm-cd` | 182 | 2026-02-08 | ✅ GitOps declarative (ArgoCD for Swarm), UI, SOPS secrets |
+| `easytier` | `EasyTier/EasyTier` | 10800 | 2026-04-12 | ✅ Full WireGuard mesh, NAT traversal, web UI. Reduces nano-mesh to wrapper |
+
+#### Tier 1: Active, High Value (deploy and extend)
 
 | Repo | Source | Stars | Last Push | Language | Role |
 |:---|:---|:---|:---|:---|:---|
 | `coolify` | `coollabsio/coolify` | 52963 | 2026-04-12 | PHP | PaaS / GitOps deployments |
 | `portainer-ce` | `portainer/portainer` | 37145 | 2026-04-10 | TypeScript | Cluster management UI + RBAC |
-| `easytier` | `EasyTier/EasyTier` | 10800 | 2026-04-12 | Rust | WireGuard mesh (nano-mesh base) |
 | `swarmpit` | `swarmpit/swarmpit` | 3420 | 2026-03-04 | Clojure | Lightweight Swarm UI |
-| `swarm-cronjob` | `crazy-max/swarm-cronjob` | 868 | 2026-04-09 | Go | Cron jobs on Swarm |
-| `swarm-cd` | `m-adawi/swarm-cd` | 182 | 2026-02-08 | Go | GitOps for Swarm |
-| `gantry` | `shizunge/gantry` | 88 | 2026-04-12 | Shell | Auto-update services |
 
 #### Tier 2: Useful but Less Active
 
@@ -86,13 +89,12 @@ Valuable code to fork and extend, but upstream is slower or stale.
 | `seaweedfs-swarm` | `cycneuramus/seaweedfs-docker-swarm` | 16 | 2023-01-10 | Shell | SeaweedFS on Swarm |
 | `seaweedfs-volume-plugin` | `onaci/docker-plugin-seaweedfs` | 14 | 2021-02-18 | Go | Docker volume driver |
 
-#### Tier 3: Reference / Evaluate
-
-Low activity, useful as reference code but likely needs rewrite.
+#### Tier 3: Reference / Superseded
 
 | Repo | Source | Stars | Last Push | Language | Role |
 |:---|:---|:---|:---|:---|:---|
-| `hca` | `lucianorc/hca` | 1 | 2020-02-26 | Go | HPA concept (WIP) |
+| `hca` | `lucianorc/hca` | 1 | 2020-02-26 | Go | HPA concept (WIP, abandoned) |
+| `swarm-sync` | `swarm-pack/swarm-sync` | 98 | 2023-01-07 | JavaScript | Superseded by swarm-cd |
 
 ## Docker Label Convention
 
