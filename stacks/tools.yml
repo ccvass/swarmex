@@ -1,7 +1,14 @@
 version: "3.8"
 
 # Tools stack — production-ready OSS tools for Swarm
+# Pre-req: run scripts/pre-deploy.sh first
 # Deploy: docker stack deploy -c stacks/tools.yml tools
+
+configs:
+  swarmcd_repos:
+    file: ../configs/swarmcd/repos.yaml
+  swarmcd_stacks:
+    file: ../configs/swarmcd/stacks.yaml
 
 services:
   portainer:
@@ -20,11 +27,6 @@ services:
         traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN:-localhost}`)"
         traefik.http.routers.portainer.tls.certresolver: "le"
         traefik.http.services.portainer.loadbalancer.server.port: "9000"
-    healthcheck:
-      test: ["CMD", "/docker", "container", "top", "portainer"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
     networks:
       - traefik-public
 
@@ -32,8 +34,11 @@ services:
     image: ghcr.io/m-adawi/swarm-cd:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - swarmcd_repos:/app/repos.yaml:ro
-      - swarmcd_stacks:/app/stacks.yaml:ro
+    configs:
+      - source: swarmcd_repos
+        target: /app/repos.yaml
+      - source: swarmcd_stacks
+        target: /app/stacks.yaml
     deploy:
       mode: replicated
       replicas: 1
@@ -59,8 +64,6 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
-    networks:
-      - tools
 
   gantry:
     image: shizunge/gantry:latest
@@ -79,17 +82,10 @@ services:
         constraints: [node.role == manager]
       labels:
         gantry.services.excluded: "true"
-    networks:
-      - tools
 
 volumes:
   portainer_data:
-  swarmcd_repos:
-  swarmcd_stacks:
 
 networks:
   traefik-public:
     external: true
-  tools:
-    driver: overlay
-    attachable: true

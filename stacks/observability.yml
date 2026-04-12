@@ -1,15 +1,29 @@
 version: "3.8"
 
 # Observability stack for Swarmex
+# Pre-req: run scripts/pre-deploy.sh first
 # Deploy: docker stack deploy -c stacks/observability.yml observability
+
+configs:
+  prometheus_config:
+    file: ../configs/prometheus/prometheus.yml
+  prometheus_alerts:
+    file: ../configs/prometheus/alerts.yml
+  loki_config:
+    file: ../configs/loki/config.yaml
+  tempo_config:
+    file: ../configs/tempo/config.yaml
 
 services:
   prometheus:
     image: prom/prometheus:latest
     volumes:
       - prometheus_data:/prometheus
-      - ../configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../configs/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: prometheus_alerts
+        target: /etc/prometheus/alerts.yml
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=15d"
@@ -60,6 +74,9 @@ services:
     image: grafana/loki:latest
     volumes:
       - loki_data:/loki
+    configs:
+      - source: loki_config
+        target: /etc/loki/local-config.yaml
     command: -config.file=/etc/loki/local-config.yaml
     deploy:
       mode: replicated
@@ -77,10 +94,18 @@ services:
 
   tempo:
     image: grafana/tempo:latest
+    configs:
+      - source: tempo_config
+        target: /etc/tempo.yaml
     command: ["-config.file=/etc/tempo.yaml"]
     deploy:
       mode: replicated
       replicas: 1
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - monitoring
 
@@ -141,7 +166,6 @@ secrets:
 
 networks:
   monitoring:
-    driver: overlay
-    attachable: true
+    external: true
   traefik-public:
     external: true

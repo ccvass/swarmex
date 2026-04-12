@@ -1,13 +1,24 @@
 version: "3.8"
 
 # Storage stack for Swarmex
+# Pre-req: run scripts/pre-deploy.sh first
 # Deploy: docker stack deploy -c stacks/storage.yml storage
-# Based on cycneuramus/seaweedfs-docker-swarm
+
+configs:
+  seaweedfs_master_entrypoint:
+    file: ../configs/seaweedfs/master-entrypoint.sh
+  seaweedfs_filer_entrypoint:
+    file: ../configs/seaweedfs/filer-entrypoint.sh
 
 services:
   seaweedfs-master:
     image: chrislusf/seaweedfs:latest
-    command: "master -ip=seaweedfs-master -defaultReplication=001"
+    entrypoint: /bin/sh
+    command: ["/etc/seaweedfs/master-entrypoint.sh"]
+    configs:
+      - source: seaweedfs_master_entrypoint
+        target: /etc/seaweedfs/master-entrypoint.sh
+        mode: 0755
     volumes:
       - master_data:/data
     deploy:
@@ -30,14 +41,17 @@ services:
       - volume_data:/data
     deploy:
       mode: global
-    depends_on:
-      - seaweedfs-master
     networks:
       - storage
 
   seaweedfs-filer:
     image: chrislusf/seaweedfs:latest
-    command: "filer -master=seaweedfs-master:9333"
+    entrypoint: /bin/sh
+    command: ["/etc/seaweedfs/filer-entrypoint.sh"]
+    configs:
+      - source: seaweedfs_filer_entrypoint
+        target: /etc/seaweedfs/filer-entrypoint.sh
+        mode: 0755
     volumes:
       - filer_data:/data
     deploy:
@@ -48,13 +62,12 @@ services:
         traefik.http.routers.seaweedfs.rule: "Host(`storage.${DOMAIN:-localhost}`)"
         traefik.http.routers.seaweedfs.tls.certresolver: "le"
         traefik.http.services.seaweedfs.loadbalancer.server.port: "8888"
-    depends_on:
-      - seaweedfs-master
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8888/"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 15s
     networks:
       - storage
       - traefik-public
@@ -66,7 +79,6 @@ volumes:
 
 networks:
   storage:
-    driver: overlay
-    attachable: true
+    external: true
   traefik-public:
     external: true

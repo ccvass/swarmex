@@ -56,7 +56,6 @@ volumes:
 
 networks:
   traefik-public:
-    driver: overlay
-    attachable: true
+    external: true
   monitoring:
     external: true

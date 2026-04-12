@@ -1,11 +1,12 @@
 version: "3.8"
 
 # Security stack for Swarmex
+# Pre-req: run scripts/pre-deploy.sh first
 # Deploy: docker stack deploy -c stacks/security.yml security
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:latest
+    image: registry.labtau.com/ccvass/swarmex/authentik:latest
     command: server
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
@@ -30,12 +31,13 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
     networks:
       - security
       - traefik-public
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:latest
+    image: registry.labtau.com/ccvass/swarmex/authentik:latest
     command: worker
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
@@ -91,11 +93,19 @@ services:
 
   openbao:
     image: openbao/openbao:latest
-    command: server
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        chown -R openbao:openbao /bao/data 2>/dev/null || true
+        exec bao server -config=/bao/config/config.hcl
     environment:
-      - BAO_LOCAL_CONFIG={"storage":{"raft":{"path":"/bao/data"}},"listener":{"tcp":{"address":"0.0.0.0:8200","tls_disable":true}},"api_addr":"http://openbao:8200","cluster_addr":"http://openbao:8201","ui":true}
+      - BAO_ADDR=http://127.0.0.1:8200
     volumes:
       - openbao_data:/bao/data
+    configs:
+      - source: openbao_config
+        target: /bao/config/config.hcl
     deploy:
       mode: replicated
       replicas: 1
@@ -107,15 +117,20 @@ services:
         traefik.http.routers.openbao.tls.certresolver: "le"
         traefik.http.services.openbao.loadbalancer.server.port: "8200"
     healthcheck:
-      test: ["CMD", "bao", "status", "-format=json"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
     cap_add:
       - IPC_LOCK
     networks:
       - security
       - traefik-public
+
+configs:
+  openbao_config:
+    file: ../configs/openbao/config.hcl
 
 volumes:
   authentik_db_data:
@@ -130,7 +145,6 @@ secrets:
 
 networks:
   security:
-    driver: overlay
-    attachable: true
+    external: true
   traefik-public:
     external: true
