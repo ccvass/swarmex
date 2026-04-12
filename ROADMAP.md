@@ -27,8 +27,11 @@ Before building anything, we analyzed what the forked projects already solve.
 
 | Fork | Reason | Action |
 |:---|:---|:---|
-| `swarm-sync` | Superseded by `swarm-cd` (more features, active, UI) | Keep as reference, use swarm-cd |
-| `hca` | 1 star, WIP since 2020, abandoned | API reference only |
+| `swarm-sync` | Superseded by `swarm-cd` (more features, active, UI) | Discard |
+| `hca` | 1 star, WIP since 2020, abandoned | Discard |
+| `coolify` | Swarm support issue #514 closed as "not planned". Uses Docker standalone, not `docker stack deploy`. swarm-cd covers PaaS/GitOps natively | Discard |
+| `promswarm` | Stale since 2024-04. swarm-monitoring is more recent and cleaner | Discard |
+| `swarmpit` | Optional alternative UI, not needed with Portainer CE | Keep as optional |
 
 ## Custom Services to Build
 

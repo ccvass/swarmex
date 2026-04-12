@@ -91,10 +91,13 @@ Valuable code to fork and extend, but upstream is slower or stale.
 
 #### Tier 3: Reference / Superseded
 
-| Repo | Source | Stars | Last Push | Language | Role |
+| Repo | Source | Stars | Last Push | Language | Status |
 |:---|:---|:---|:---|:---|:---|
-| `hca` | `lucianorc/hca` | 1 | 2020-02-26 | Go | HPA concept (WIP, abandoned) |
-| `swarm-sync` | `swarm-pack/swarm-sync` | 98 | 2023-01-07 | JavaScript | Superseded by swarm-cd |
+| `hca` | `lucianorc/hca` | 1 | 2020-02-26 | Go | ❌ Abandoned |
+| `swarm-sync` | `swarm-pack/swarm-sync` | 98 | 2023-01-07 | JavaScript | ❌ Superseded by swarm-cd |
+| `coolify` | `coollabsio/coolify` | 52963 | 2026-04-12 | PHP | ❌ No Swarm support (issue #514 closed) |
+| `promswarm` | `neuroforgede/promswarm` | 33 | 2024-04-06 | Jinja | ❌ Stale, swarm-monitoring is newer |
+| `swarmpit` | `swarmpit/swarmpit` | 3420 | 2026-03-04 | Clojure | Optional (Portainer CE is primary UI) |
 
 ## Docker Label Convention
 
@@ -120,16 +123,20 @@ services:
         swarmex.deployer.strategy: "blue-green"
 ```
 
-## OSS Policy
+## Production Stack (OSS Only)
 
-All components are 100% open source. When dual-licensed (CE/EE), we fork the community edition only.
-
-| Decision | Reason |
-|:---|:---|
-| OpenBao over HashiCorp Vault | Vault changed to BUSL-1.1; OpenBao is MPL-2.0 |
-| Portainer CE only | EE is proprietary; CE is Zlib |
-| EasyTier over Netmaker | Netmaker has SSPL components; EasyTier is Apache-2.0 |
-| Grafana stack (AGPL-3.0) | OK for internal use, no SaaS redistribution |
+| Layer | Tool | License | Decision |
+|:---|:---|:---|:---|
+| UI / RBAC | Portainer CE + Authentik | Zlib + MIT | CE lacks granular RBAC/SSO, Authentik fills both |
+| Ingress / L7 | Traefik Proxy | MIT | Native Swarm provider |
+| GitOps / PaaS | swarm-cd | GPL-3.0 | ArgoCD for Swarm. Coolify discarded (no Swarm support) |
+| Observability | swarm-monitoring + AlertManager + Loki + Tempo | MIT + Apache | swarm-monitoring base (2025), promswarm discarded (stale 2024) |
+| Storage | SeaweedFS | Apache-2.0 | seaweedfs-swarm + volume-plugin |
+| SSO | Authentik | MIT-variant | OIDC/SAML for Portainer, Grafana, Traefik |
+| Secrets | OpenBao | MPL-2.0 | Vault fork, API-compatible |
+| Mesh | EasyTier | LGPL-3.0 | nano-mesh wraps it |
+| Cron | swarm-cronjob | MIT | Production-ready, v1.15 |
+| Auto-update | gantry | GPL-3.0 | 36 releases, rollback, webhooks |
 
 ## License
 
