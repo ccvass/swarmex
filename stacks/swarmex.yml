@@ -1,0 +1,94 @@
+# Swarmex Controllers Stack
+# Deploys all custom Swarmex sidecar controllers on the Swarm cluster.
+# Requires: observability stack (Prometheus), ingress stack (Traefik)
+
+version: "3.8"
+
+services:
+  event-controller:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-event-controller:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - swarmex
+
+  scaler:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-scaler:latest
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - swarmex
+      - monitoring
+
+  gatekeeper:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-gatekeeper:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - swarmex
+      - traefik-public
+
+  remediation:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-remediation:latest
+    environment:
+      - PROMETHEUS_URL=http://prometheus:9090
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - swarmex
+      - monitoring
+
+networks:
+  swarmex:
+    driver: overlay
+    attachable: true
+  monitoring:
+    external: true
+  traefik-public:
+    external: true
