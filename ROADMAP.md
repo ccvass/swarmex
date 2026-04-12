@@ -3,95 +3,144 @@
 Detailed implementation plan with all open source resources mapped per phase.
 Every tool listed is OSS. When dual-licensed (CE/EE), we fork the community edition.
 
-## Resource Index
+## Custom Services to Build
+
+These are the core Swarmex services that **do not exist** and must be developed from scratch.
+All are built on the **Docker Event Stream** pattern (section 5 of SWARMEX.md) using the Docker Engine SDK.
+
+### Base Layer
+
+| Service | Repo | Language | Purpose |
+|:---|:---|:---|:---|
+| **Event Controller** | `swarmex-event-controller` | Go | Base event stream listener. Connects to `/var/run/docker.sock`, filters `container`, `service`, `node` events, and dispatches to registered handlers. Shared library used by all other controllers. |
+
+### Gap Analysis Services (SWARMEX.md Section 3)
+
+| Service | Repo | Language | Gap Covered | Description |
+|:---|:---|:---|:---|:---|
+| **Swarm-Scaler** | `swarmex-scaler` | Go | Horizontal Autoscaling (HPA) | Consumes Prometheus metrics (CPU/RAM/latency), executes `docker service update --replicas` in real-time. Configurable thresholds, cooldown periods, min/max replica bounds per service via labels. |
+| **Traffic-Gatekeeper** | `swarmex-gatekeeper` | Go | Readiness Probes | Listens Docker socket events, performs L7 healthchecks (HTTP 200) on containers, activates/deactivates Traefik routing labels dynamically. Blocks traffic until app is truly ready. |
+| **Swarm-Operator-DB** | `swarmex-operator-db` | Go | Stateful Operators | Reconciliation loops for database lifecycle: quorum management (PostgreSQL, MySQL), automated failover on node/volume loss, backup scheduling, volume migration between nodes. |
+| **Vault-Sync-Sidecar** | `swarmex-vault-sync` | Go | Dynamic Secret Injection | Sidecar that reads secrets from OpenBao (Vault OSS fork), injects into container memory via tmpfs at `/run/secrets/`, watches for rotation events and hot-reloads without container restart. |
+| **Nano-Mesh** | `swarmex-nano-mesh` | Go | Lightweight Service Mesh | Automatic WireGuard tunnel provisioning between services. Provides mTLS-equivalent encryption on overlay networks. Auto-discovers services via Docker events, manages peer configs. |
+
+### Additional Controllers (SWARMEX.md Section 4)
+
+| Service | Repo | Language | Phase | Description |
+|:---|:---|:---|:---|:---|
+| **Healthcheck-Remediation** | `swarmex-remediation` | Go | Phase 3 | Retry-and-purge logic: detects persistent healthcheck failures in the data plane, auto-restarts tasks, purges caches, escalates to node drain if failures persist. |
+| **Blue/Green Deployer** | `swarmex-deployer` | Go | Phase 4 | External controller that manages traffic weight between service versions during updates. Creates parallel service, shifts Traefik weights gradually, rolls back on failure. |
+
+### Architecture Pattern
+
+All custom services follow the same pattern from SWARMEX.md section 5:
+
+```
+Docker Socket (/var/run/docker.sock)
+        │
+        ▼
+┌─────────────────────┐
+│  Event Controller    │  ← swarmex-event-controller (shared)
+│  GET /events         │
+│  Filter: container,  │
+│  service, node       │
+└────────┬────────────┘
+         │ dispatch
+         ▼
+┌─────────────────────┐
+│  Business Logic      │  ← swarmex-scaler, gatekeeper, etc.
+│  - Query Prometheus  │
+│  - Check health      │
+│  - Update service    │
+│  - Rotate secrets    │
+└─────────────────────┘
+```
+
+### Repo Summary (all under `ccvass/swarmex` group)
+
+| Repo | Type | Status |
+|:---|:---|:---|
+| `swarmex-coordinator` | Docs/coordination | Created |
+| `swarmex-event-controller` | Shared library | To create |
+| `swarmex-scaler` | Custom service | To create |
+| `swarmex-gatekeeper` | Custom service | To create |
+| `swarmex-operator-db` | Custom service | To create |
+| `swarmex-vault-sync` | Custom service | To create |
+| `swarmex-nano-mesh` | Custom service | To create |
+| `swarmex-remediation` | Custom service | To create |
+| `swarmex-deployer` | Custom service | To create |
+
+---
+
+## OSS Resources to Fork or Deploy
+
+Existing tools that complement the custom services.
 
 ### Core Infrastructure
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
 | SwarmKit | Swarm control plane (upstream) | Apache-2.0 | `moby/swarmkit` | Reference only |
-| Portainer CE | Cluster management UI + RBAC | Zlib | `portainer/portainer` | Fork to extend |
-| Swarmpit | Lightweight Swarm management UI | Eclipse | `swarmpit/swarmpit` | Fork to extend |
-| Coolify | PaaS / GitOps deployments | Apache-2.0 | `coollabsio/coolify` | Fork to extend |
+| Portainer CE | Cluster management UI + RBAC | Zlib | `portainer/portainer` | Fork CE |
+| Swarmpit | Lightweight Swarm management UI | Eclipse | `swarmpit/swarmpit` | Fork |
+| Coolify | PaaS / GitOps deployments | Apache-2.0 | `coollabsio/coolify` | Fork, extend Swarm support |
 | Authentik | SSO / Identity Provider | MIT-variant | `goauthentik/authentik` | Deploy as-is |
 
 ### Observability
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
 | Prometheus | Metrics collection | Apache-2.0 | `prometheus/prometheus` | Deploy as-is |
-| Grafana | Dashboards and visualization | AGPL-3.0 | `grafana/grafana` | Deploy as-is |
+| Grafana | Dashboards | AGPL-3.0 | `grafana/grafana` | Deploy as-is |
 | Loki | Log aggregation | AGPL-3.0 | `grafana/loki` | Deploy as-is |
 | Tempo | Distributed tracing | AGPL-3.0 | `grafana/tempo` | Deploy as-is |
-| Promswarm | Modernized Swarmprom stack | MIT | `neuroforgede/promswarm` | Fork as base |
-| swarmlibs monitoring | Telemetry guide for Swarm | MIT | `swarmlibs/dockerswarm-monitoring-guide` | Reference |
-| swarm-monitoring | Prometheus+cAdvisor+Grafana stack | MIT | `sam-mosleh/swarm-monitoring` | Fork as base |
-| docker-engine-events-exporter | Prometheus exporter for Docker events | OSS | awesome-swarm reference | Fork to extend |
+| Promswarm | Swarmprom modernized | MIT | `neuroforgede/promswarm` | Fork as base |
+| swarm-monitoring | Prometheus+cAdvisor+Grafana | MIT | `sam-mosleh/swarm-monitoring` | Fork as base |
 
 ### Networking and Ingress
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
 | Traefik Proxy | Dynamic reverse proxy + SSL | MIT | `traefik/traefik` | Deploy as-is |
-| Caddy Docker Proxy | Alternative reverse proxy | Apache-2.0 | `lucaslorentz/caddy-docker-proxy` | Evaluate |
-| Netmaker | WireGuard mesh networking | SSPL/Apache | `gravitl/netmaker` | Evaluate license |
-| EasyTier | Decentralized WireGuard mesh VPN | Apache-2.0 | `EasyTier/EasyTier` | Fork for nano-mesh |
-| Webmesh | Zero-config WireGuard mesh | Apache-2.0 | `webmeshproj/webmesh` | Fork for nano-mesh |
+| EasyTier | Decentralized WireGuard mesh | Apache-2.0 | `EasyTier/EasyTier` | Fork for nano-mesh base |
+| Webmesh | Zero-config WireGuard mesh | Apache-2.0 | `webmeshproj/webmesh` | Evaluate vs EasyTier |
 
-### Autoscaling
+### Autoscaling (bases for swarmex-scaler)
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
-| docker-swarm-autoscaler | CPU-based autoscaling via Prometheus | MIT | `jcwimer/docker-swarm-autoscaler` | Fork as base |
-| HCA | HPA-style autoscaler for Swarm | OSS | `lucianorc/hca` | Fork to extend |
-| docker-swarm-service-autoscaler | Threshold-based scaling | OSS | `sahajsoft/docker-swarm-service-autoscaler` | Reference |
-| Swarm Pilot | Scale by CPU and memory usage | OSS | awesome-swarm reference | Fork to extend |
+| docker-swarm-autoscaler | CPU-based autoscaling | MIT | `jcwimer/docker-swarm-autoscaler` | Fork, extend in scaler |
+| HCA | HPA-style for Swarm | OSS | `lucianorc/hca` | Fork, reference |
 
 ### Storage
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
 | SeaweedFS | Distributed blob/file storage | Apache-2.0 | `seaweedfs/seaweedfs` | Deploy as-is |
-| SeaweedFS Docker Volume Plugin | Docker volume driver for SeaweedFS | OSS | `onaci/docker-plugin-seaweedfs` | Fork to extend |
+| SeaweedFS Volume Plugin | Docker volume driver | OSS | `onaci/docker-plugin-seaweedfs` | Fork |
 | SeaweedFS Swarm Stack | HA SeaweedFS on Swarm | OSS | `cycneuramus/seaweedfs-docker-swarm` | Fork as base |
-| JuiceFS | Distributed POSIX FS on S3 | Apache-2.0 | `juicedata/juicefs` | Evaluate |
-| GlusterFS | Scale-out NAS filesystem | GPL-3.0 | `gluster/glusterfs` | Evaluate |
 
-### Secrets Management
+### Secrets (bases for swarmex-vault-sync)
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
-| HashiCorp Vault | Secret storage and rotation | BUSL-1.1 | `hashicorp/vault` | Use last MPL-2.0 release |
-| OpenBao | Vault OSS fork (post-BUSL) | MPL-2.0 | `openbao/openbao` | Fork to extend |
-| docker-stack-deploy | Auto config/secret rotation | OSS | awesome-swarm reference | Fork to extend |
-| Vault Swarm Plugin PoC | Docker secrets driver for Vault | OSS | blog.sunekeller.dk reference | Reference |
+| OpenBao | Vault OSS fork (post-BUSL) | MPL-2.0 | `openbao/openbao` | Deploy, integrate |
+| docker-stack-deploy | Auto config/secret rotation | OSS | awesome-swarm ref | Fork |
 
 ### GitOps and CD
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
-| SwarmCD | Declarative GitOps for Swarm | OSS | `m-adawi/swarm-cd` | Fork to extend |
-| Swarm Sync | GitOps for Docker Swarm | OSS | `swarm-pack/swarm-sync` | Fork to extend |
-| doco-cd | Lightweight GitOps polling/webhooks | OSS | awesome-swarm reference | Evaluate |
-| Gantry | Enhanced auto-update for services | OSS | `shizunge/gantry` | Fork to extend |
-| Shepherd | Auto-update services on image refresh | MIT | `containrrr/shepherd` | Reference |
+| SwarmCD | Declarative GitOps for Swarm | OSS | `m-adawi/swarm-cd` | Fork |
+| Swarm Sync | GitOps for Docker Swarm | OSS | `swarm-pack/swarm-sync` | Fork |
+| Gantry | Enhanced auto-update services | OSS | `shizunge/gantry` | Fork |
 
-### Scheduling and Jobs
+### Scheduling and Utilities
 
-| Tool | Purpose | License | GitHub | Fork Priority |
+| Tool | Purpose | License | GitHub | Action |
 |:---|:---|:---|:---|:---|
-| swarm-cronjob | Cron-based jobs on Swarm | MIT | `crazy-max/swarm-cronjob` | Fork to extend |
-| Ofelia | Docker job scheduler (crontab) | MIT | `mcuadros/ofelia` | Evaluate |
-
-### Cluster Utilities
-
-| Tool | Purpose | License | GitHub | Fork Priority |
-|:---|:---|:---|:---|:---|
-| CapRover | Self-hosted PaaS on Swarm | Apache-2.0 | `caprover/caprover` | Evaluate |
-| Swarmhook | Redeploy via webhooks | OSS | awesome-swarm reference | Fork to extend |
-| docker-swarm-proxy | `docker exec` for Swarm services | OSS | awesome-swarm reference | Fork to extend |
-| docker-stack-wait | Wait for stack deploy completion | OSS | awesome-swarm reference | Integrate |
-| nothelm.py | Stack templating tool | OSS | awesome-swarm reference | Evaluate |
+| swarm-cronjob | Cron-based jobs on Swarm | MIT | `crazy-max/swarm-cronjob` | Fork |
+| Shepherd | Auto-update on image refresh | MIT | `containrrr/shepherd` | Reference |
 
 ---
 
@@ -99,156 +148,102 @@ Every tool listed is OSS. When dual-licensed (CE/EE), we fork the community edit
 
 **Goal:** Establish telemetry for automated decision-making.
 
-### Deliverables
+### Deploy (existing OSS)
 
-- [ ] Deploy Prometheus + Grafana + Loki + Tempo stack on Swarm
-- [ ] Fork `sam-mosleh/swarm-monitoring` as monitoring base
-- [ ] Fork `neuroforgede/promswarm` for production-ready alerting
-- [ ] Deploy Portainer CE for cluster management and RBAC
-- [ ] Configure cAdvisor + Node Exporter on all nodes
-- [ ] Create Grafana dashboards for Swarm-specific metrics
-- [ ] Deploy Authentik for SSO across all services
+- [ ] Prometheus + Grafana + Loki + Tempo stack on Swarm
+- [ ] Fork `sam-mosleh/swarm-monitoring` → `ccvass/swarmex/swarm-monitoring`
+- [ ] Fork `neuroforgede/promswarm` → `ccvass/swarmex/promswarm`
+- [ ] Deploy Portainer CE, fork `portainer/portainer` → `ccvass/swarmex/portainer-ce`
+- [ ] cAdvisor + Node Exporter on all nodes
+- [ ] Deploy Authentik for SSO
 
-### Key Resources to Fork
+### Build (custom)
 
-```text
-sam-mosleh/swarm-monitoring       → ccvass/swarmex/swarm-monitoring
-neuroforgede/promswarm            → ccvass/swarmex/promswarm
-portainer/portainer (CE)          → ccvass/swarmex/portainer-ce
-```
+- [ ] Create `swarmex-event-controller` repo — base event stream library
+- [ ] Implement Docker socket connection, event filtering, handler dispatch
+- [ ] Unit tests with mock Docker events
 
 ---
 
 ## Phase 2: Traffic Intelligence and Ingress
 
-**Goal:** Guarantee traffic only reaches healthy containers.
+**Goal:** Traffic only reaches healthy containers.
 
-### Deliverables
+### Deploy (existing OSS)
 
-- [ ] Deploy Traefik Proxy with Swarm Mode provider
-- [ ] Build `swarmex-gatekeeper`: service that listens Docker socket and toggles Traefik labels based on app-level healthchecks
-- [ ] Implement L7 readiness probes (HTTP 200 check before routing)
-- [ ] Configure automatic SSL via Let's Encrypt
-- [ ] Evaluate WireGuard mesh options (EasyTier vs Webmesh) for nano-mesh
+- [ ] Traefik Proxy with Swarm Mode provider
+- [ ] Automatic SSL via Let's Encrypt
+- [ ] Evaluate WireGuard mesh: fork `EasyTier/EasyTier` or `webmeshproj/webmesh`
 
-### Key Resources to Fork
+### Build (custom)
 
-```text
-traefik/traefik                   → Deploy as-is (MIT)
-EasyTier/EasyTier                 → ccvass/swarmex/easytier (evaluate)
-webmeshproj/webmesh               → ccvass/swarmex/webmesh (evaluate)
-```
-
-### Custom Development
-
-- `swarmex-gatekeeper` — New repo. Go service using Docker SDK to:
-  1. Listen to container health events
-  2. Add/remove Traefik routing labels dynamically
-  3. Block traffic to containers that fail readiness checks
+- [ ] Create `swarmex-gatekeeper` repo
+- [ ] Implement: listen Docker socket → detect container health events → toggle Traefik labels
+- [ ] L7 readiness probes: HTTP 200 check before allowing Traefik to route
+- [ ] Integration tests with Traefik + mock unhealthy containers
 
 ---
 
 ## Phase 3: Elasticity and Self-Healing
 
-**Goal:** Eliminate human intervention for load management and failure recovery.
+**Goal:** Zero human intervention for load and failure management.
 
-### Deliverables
+### Deploy (existing OSS)
 
-- [ ] Fork `jcwimer/docker-swarm-autoscaler` as base for swarmex-scaler
-- [ ] Extend with RAM/latency metrics (not just CPU)
-- [ ] Integrate with Prometheus for metric-driven scaling decisions
-- [ ] Build healthcheck remediation: auto-restart + cache purge on persistent failures
-- [ ] Fork `crazy-max/swarm-cronjob` for scheduled maintenance tasks
-- [ ] Fork `shizunge/gantry` for automated service image updates
+- [ ] Fork `jcwimer/docker-swarm-autoscaler` → `ccvass/swarmex/swarm-autoscaler`
+- [ ] Fork `crazy-max/swarm-cronjob` → `ccvass/swarmex/swarm-cronjob`
+- [ ] Fork `shizunge/gantry` → `ccvass/swarmex/gantry`
 
-### Key Resources to Fork
+### Build (custom)
 
-```text
-jcwimer/docker-swarm-autoscaler   → ccvass/swarmex/swarm-autoscaler
-lucianorc/hca                     → ccvass/swarmex/hca
-crazy-max/swarm-cronjob           → ccvass/swarmex/swarm-cronjob
-shizunge/gantry                   → ccvass/swarmex/gantry
-```
-
-### Custom Development
-
-- `swarmex-scaler` — New repo. Go service that:
-  1. Queries Prometheus for CPU/RAM/latency per service
-  2. Compares against configurable thresholds
-  3. Calls `docker service update --replicas` in real-time
-  4. Supports cooldown periods and min/max replica bounds
+- [ ] Create `swarmex-scaler` repo
+- [ ] Implement: query Prometheus → compare thresholds → `docker service update --replicas`
+- [ ] Support CPU, RAM, latency metrics (not just CPU like existing tools)
+- [ ] Configurable via Docker labels: `swarmex.scaler.min=2`, `swarmex.scaler.max=10`, `swarmex.scaler.cpu-target=70`
+- [ ] Cooldown periods to prevent flapping
+- [ ] Create `swarmex-remediation` repo
+- [ ] Implement: detect persistent healthcheck failures → auto-restart tasks → purge caches → escalate to node drain
 
 ---
 
 ## Phase 4: Stateful Persistence and Zero-Downtime Deploys
 
-**Goal:** Distributed data handling and deployments without downtime.
+**Goal:** Distributed data and deployments without downtime.
 
-### Deliverables
+### Deploy (existing OSS)
 
-- [ ] Deploy SeaweedFS cluster on Swarm for distributed volumes
-- [ ] Fork `cycneuramus/seaweedfs-docker-swarm` as storage base
-- [ ] Fork `onaci/docker-plugin-seaweedfs` for Docker volume integration
-- [ ] Build blue/green deployment controller using Traefik traffic weights
-- [ ] Integrate OpenBao (Vault OSS fork) for dynamic secret rotation
-- [ ] Fork `m-adawi/swarm-cd` for GitOps-driven deployments
-- [ ] Fork `swarm-pack/swarm-sync` as alternative GitOps approach
-- [ ] Build `swarmex-operator-db` for database lifecycle management
+- [ ] SeaweedFS cluster, fork `cycneuramus/seaweedfs-docker-swarm`
+- [ ] Fork `onaci/docker-plugin-seaweedfs` for volume driver
+- [ ] Deploy OpenBao (`openbao/openbao`, MPL-2.0)
+- [ ] Fork `m-adawi/swarm-cd` → `ccvass/swarmex/swarm-cd`
 
-### Key Resources to Fork
+### Build (custom)
 
-```text
-seaweedfs/seaweedfs               → Deploy as-is (Apache-2.0)
-cycneuramus/seaweedfs-docker-swarm → ccvass/swarmex/seaweedfs-swarm
-onaci/docker-plugin-seaweedfs     → ccvass/swarmex/seaweedfs-volume-plugin
-openbao/openbao                   → ccvass/swarmex/openbao
-m-adawi/swarm-cd                  → ccvass/swarmex/swarm-cd
-swarm-pack/swarm-sync             → ccvass/swarmex/swarm-sync
-```
-
-### Custom Development
-
-- `swarmex-operator-db` — New repo. Reconciliation scripts for:
-  1. Database quorum management (PostgreSQL, MySQL)
-  2. Automated failover on volume server loss
-  3. Backup scheduling integrated with swarm-cronjob
-  4. Volume migration between nodes
-
-- `swarmex-vault-sync` — New repo. Sidecar that:
-  1. Reads secrets from OpenBao/Vault
-  2. Injects into container memory (tmpfs)
-  3. Watches for rotation events and hot-reloads
+- [ ] Create `swarmex-operator-db` repo
+- [ ] Implement: reconciliation loops for PostgreSQL/MySQL quorum, automated failover, backup scheduling, volume migration
+- [ ] Create `swarmex-vault-sync` repo
+- [ ] Implement: read OpenBao secrets → inject tmpfs `/run/secrets/` → watch rotation → hot-reload
+- [ ] Create `swarmex-deployer` repo
+- [ ] Implement: blue/green controller → create parallel service → shift Traefik weights → rollback on failure
+- [ ] Create `swarmex-nano-mesh` repo
+- [ ] Implement: auto-discover services via Docker events → provision WireGuard tunnels → manage peer configs → mTLS-equivalent encryption
 
 ---
 
-## Reference Collections
-
-### Awesome Lists
-
-- [BretFisher/awesome-swarm](https://github.com/BretFisher/awesome-swarm) — Curated list of Swarm tools (726 stars)
-- [swarmlibs](https://github.com/swarmlibs) — Migrated from YouMightNotNeedKubernetes org
-- [dockerswarm.rocks](https://dockerswarm.rocks) — Tutorials and code samples
-- [Docker Swarm Still Rocks](https://dockerswarmstillrocks.com) — Updated tutorials
-
-### Official Resources
-
-- [Docker Swarm Docs](https://docs.docker.com/engine/swarm/)
-- [SwarmKit Repository](https://github.com/moby/swarmkit) — Apache-2.0
-- [Mirantis Swarm Support until 2030](https://www.mirantis.com/blog/mirantis-guarantees-long-term-support-for-swarm/)
-
-### Community
-
-- Discord: Cloud Native DevOps `#swarm` channel
-- [SwarmKit.org Forum](https://swarmkit.org)
-
----
-
-## License Audit Notes
+## License Audit
 
 | Tool | Issue | Action |
 |:---|:---|:---|
-| HashiCorp Vault | Changed to BUSL-1.1 in 2023 | Use OpenBao (MPL-2.0 fork) instead |
+| HashiCorp Vault | Changed to BUSL-1.1 in 2023 | Use OpenBao (MPL-2.0 fork) |
 | Portainer | CE is Zlib (OSS), EE is proprietary | Fork CE only |
-| Netmaker | SSPL for some components | Evaluate; prefer EasyTier (Apache-2.0) |
-| Grafana/Loki/Tempo | AGPL-3.0 | OK for internal use, no SaaS redistribution |
-| Coolify | Swarm support is limited | Fork and extend Swarm integration |
+| Netmaker | SSPL for some components | Prefer EasyTier (Apache-2.0) |
+| Grafana/Loki/Tempo | AGPL-3.0 | OK for internal use |
+| Coolify | Swarm support limited | Fork and extend |
+
+## Reference Collections
+
+- [BretFisher/awesome-swarm](https://github.com/BretFisher/awesome-swarm) — 726 stars
+- [swarmlibs](https://github.com/swarmlibs) — Migrated from YouMightNotNeedKubernetes
+- [Docker Swarm Docs](https://docs.docker.com/engine/swarm/)
+- [SwarmKit](https://github.com/moby/swarmkit) — Apache-2.0
+- [Mirantis Swarm Support until 2030](https://www.mirantis.com/blog/mirantis-guarantees-long-term-support-for-swarm/)
