@@ -1,0 +1,95 @@
+version: "3.8"
+
+# Tools stack — production-ready OSS tools for Swarm
+# Deploy: docker stack deploy -c stacks/tools.yml tools
+
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.portainer.rule: "Host(`portainer.${DOMAIN:-localhost}`)"
+        traefik.http.routers.portainer.tls.certresolver: "le"
+        traefik.http.services.portainer.loadbalancer.server.port: "9000"
+    healthcheck:
+      test: ["CMD", "/docker", "container", "top", "portainer"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - traefik-public
+
+  swarm-cd:
+    image: ghcr.io/m-adawi/swarm-cd:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - swarmcd_repos:/app/repos.yaml:ro
+      - swarmcd_stacks:/app/stacks.yaml:ro
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.swarmcd.rule: "Host(`cd.${DOMAIN:-localhost}`)"
+        traefik.http.routers.swarmcd.tls.certresolver: "le"
+        traefik.http.services.swarmcd.loadbalancer.server.port: "8080"
+    networks:
+      - traefik-public
+
+  swarm-cronjob:
+    image: crazymax/swarm-cronjob:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LOG_LEVEL=info
+      - LOG_JSON=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - tools
+
+  gantry:
+    image: shizunge/gantry:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - GANTRY_SLEEP_SECONDS=300
+      - GANTRY_LOG_LEVEL=INFO
+      - GANTRY_LOG_FORMAT=json
+      - GANTRY_CLEANUP_IMAGES=true
+      - GANTRY_ROLLBACK_ON_FAILURE=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        gantry.services.excluded: "true"
+    networks:
+      - tools
+
+volumes:
+  portainer_data:
+  swarmcd_repos:
+  swarmcd_stacks:
+
+networks:
+  traefik-public:
+    external: true
+  tools:
+    driver: overlay
+    attachable: true

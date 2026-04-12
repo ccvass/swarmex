@@ -1,0 +1,72 @@
+version: "3.8"
+
+# Storage stack for Swarmex
+# Deploy: docker stack deploy -c stacks/storage.yml storage
+# Based on cycneuramus/seaweedfs-docker-swarm
+
+services:
+  seaweedfs-master:
+    image: chrislusf/seaweedfs:latest
+    command: "master -ip=seaweedfs-master -defaultReplication=001"
+    volumes:
+      - master_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9333/cluster/status"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - storage
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs:latest
+    command: "volume -mserver=seaweedfs-master:9333 -port=8080 -max=100 -dataCenter=dc1"
+    volumes:
+      - volume_data:/data
+    deploy:
+      mode: global
+    depends_on:
+      - seaweedfs-master
+    networks:
+      - storage
+
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs:latest
+    command: "filer -master=seaweedfs-master:9333"
+    volumes:
+      - filer_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.seaweedfs.rule: "Host(`storage.${DOMAIN:-localhost}`)"
+        traefik.http.routers.seaweedfs.tls.certresolver: "le"
+        traefik.http.services.seaweedfs.loadbalancer.server.port: "8888"
+    depends_on:
+      - seaweedfs-master
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8888/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - storage
+      - traefik-public
+
+volumes:
+  master_data:
+  volume_data:
+  filer_data:
+
+networks:
+  storage:
+    driver: overlay
+    attachable: true
+  traefik-public:
+    external: true
