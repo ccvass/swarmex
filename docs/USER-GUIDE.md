@@ -21,7 +21,8 @@ Complete guide from cluster setup to deploying and operating applications on Swa
 15. [Admission Rules](#15-admission-rules)
 16. [RBAC and Authentication](#16-rbac-and-authentication)
 17. [Updating Swarmex](#17-updating-swarmex)
-18. [Troubleshooting](#18-troubleshooting)
+18. [Traefik High Availability and Multiple Domains](#18-traefik-high-availability-and-multiple-domains)
+19. [Troubleshooting](#19-troubleshooting)
 
 ## 1. Infrastructure Setup
 
@@ -690,7 +691,109 @@ docker stack deploy -c stacks/observability.yml --with-registry-auth observabili
 # Repeat for other stacks as needed
 ```
 
-## 18. Troubleshooting
+## 18. Traefik High Availability and Multiple Domains
+
+### How HA Works
+
+Traefik runs as a `global` service — one instance on every node. Docker Swarm's routing mesh distributes incoming traffic (ports 80/443) across all nodes. If any node goes down, traffic automatically routes to the surviving nodes.
+
+```
+Internet → DNS (Cloudflare) → Any Node IP
+                                  │
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+               Node 1         Node 2         Node 3
+              Traefik        Traefik        Traefik
+              (global)       (global)       (global)
+```
+
+The `mode: ingress` port publishing uses Swarm's built-in load balancer. Even if you point DNS to a single node and that node dies, you only need to update DNS to another node's IP.
+
+For zero-downtime DNS failover, use Cloudflare with health checks or point DNS to all node IPs (Cloudflare supports multiple A records with automatic failover).
+
+### Rolling Updates
+
+Traefik updates use `start-first` order with 30s delay between nodes, so at least one Traefik instance is always running during updates.
+
+### Multiple Domains with Cloudflare
+
+Swarmex uses Cloudflare DNS challenge for SSL certificates. This supports:
+
+- Wildcard certificates (`*.domain1.com`, `*.domain2.com`)
+- Multiple domains on the same cluster
+- No need to expose port 80 for ACME challenges
+
+#### Setup
+
+1. Create a Cloudflare API token with `Zone:DNS:Edit` permission for your zones
+
+2. Store the token as a Docker secret:
+
+```bash
+echo -n "<cloudflare-api-token>" | docker secret create cloudflare_api_token -
+```
+
+3. Deploy the ingress stack:
+
+```bash
+ACME_EMAIL=admin@example.com DOMAIN=swarmex.example.com \
+  docker stack deploy -c stacks/ingress.yml ingress
+```
+
+#### Adding a New Domain
+
+In Cloudflare, add A records pointing to any node IP:
+
+```
+app.domain2.com    → <node-ip>
+*.domain2.com      → <node-ip>
+```
+
+In your service compose file, just use the new domain in the Traefik router rule:
+
+```yaml
+deploy:
+  labels:
+    traefik.enable: "true"
+    traefik.http.routers.myapp.rule: "Host(`app.domain2.com`)"
+    traefik.http.routers.myapp.tls.certresolver: "le"
+    traefik.http.services.myapp.loadbalancer.server.port: "8080"
+```
+
+Traefik automatically requests a certificate for `app.domain2.com` via Cloudflare DNS challenge. No configuration changes needed on Traefik itself.
+
+#### Multiple Domains on One Service
+
+```yaml
+traefik.http.routers.myapp.rule: "Host(`app.domain1.com`) || Host(`app.domain2.com`)"
+```
+
+#### Wildcard Certificates
+
+To use a single wildcard cert for all subdomains of a domain:
+
+```yaml
+traefik.http.routers.myapp.tls.domains[0].main: "domain1.com"
+traefik.http.routers.myapp.tls.domains[0].sans: "*.domain1.com"
+```
+
+#### DNS Failover with Cloudflare
+
+For automatic failover when a node dies:
+
+1. In Cloudflare, add multiple A records for the same hostname — one per node IP
+2. Enable Cloudflare proxy (orange cloud) for DDoS protection and automatic failover
+3. Or use Cloudflare Load Balancing (paid) for health-check-based failover
+
+```
+swarmex.example.com  A  44.202.134.209   (node 1)
+swarmex.example.com  A  54.211.43.209    (node 2)
+swarmex.example.com  A  44.203.57.80     (node 3)
+```
+
+Cloudflare round-robins between healthy IPs. If a node goes down, Cloudflare removes it from rotation within ~30 seconds.
+
+## 19. Troubleshooting
 
 ### Service Won't Start
 

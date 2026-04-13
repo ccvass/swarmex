@@ -2,20 +2,34 @@ version: "3.8"
 
 # Ingress stack for Swarmex
 # Deploy: docker stack deploy -c stacks/ingress.yml ingress
+#
+# HA: Traefik runs on ALL nodes (mode: global) with Docker Swarm
+# routing mesh. If any node dies, traffic routes to surviving nodes.
+#
+# SSL: Cloudflare DNS challenge for wildcard certs (*.domain.com).
+# Set CLOUDFLARE_DNS_API_TOKEN in Docker secret before deploying.
+#
+# Multiple domains: Add more SANs to the certificate resolver or
+# create additional routers with different Host() rules.
 
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.4
     command:
       - "--api.dashboard=true"
       - "--providers.swarm=true"
       - "--providers.swarm.exposedByDefault=false"
+      # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      # Let's Encrypt with Cloudflare DNS challenge (supports wildcards)
+      - "--certificatesresolvers.le.acme.dnschallenge=true"
+      - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
       - "--certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@example.com}"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      # Metrics and health
       - "--metrics.prometheus=true"
       - "--ping=true"
       - "--log.level=INFO"
@@ -23,17 +37,25 @@ services:
     ports:
       - target: 80
         published: 80
-        mode: host
+        protocol: tcp
+        mode: ingress
       - target: 443
         published: 443
-        mode: host
+        protocol: tcp
+        mode: ingress
+    secrets:
+      - cloudflare_api_token
+    environment:
+      - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_api_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_certs:/letsencrypt
     deploy:
       mode: global
-      placement:
-        constraints: [node.role == manager]
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: start-first
       labels:
         traefik.enable: "true"
         traefik.http.routers.dashboard.rule: "Host(`traefik.${DOMAIN:-localhost}`)"
@@ -53,6 +75,10 @@ services:
 
 volumes:
   traefik_certs:
+
+secrets:
+  cloudflare_api_token:
+    external: true
 
 networks:
   traefik-public:
