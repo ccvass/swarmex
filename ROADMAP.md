@@ -318,8 +318,29 @@ Completed 2026-04-13.
 
 ## All Phases Complete
 
-38 services running. 16 controllers verified end-to-end. Zero K8s feature gaps.
+35 services running. 16 controllers verified end-to-end. Reproducible install from scratch — 35/35 on first deploy.
 Cross-cloud federation tested (AWS ↔ GCP). 2 upstream PRs submitted.
+
+## Phase 9: Closing K8s Feature Gaps (Planned)
+
+Features that can be implemented as controllers to match remaining Kubernetes advantages.
+
+| Feature | Issue | Priority | Complexity |
+|:---|:---|:---|:---|
+| Canary deployments (weighted traffic) | #70 | medium | Extend deployer — Traefik weighted round-robin |
+| Service affinity/anti-affinity | #71 | medium | New controller — placement constraints |
+| Disruption budgets | #72 | medium | Extend remediation — min-available checks |
+| Resource quotas per namespace | #73 | medium | Extend admission — sum limits per namespace |
+| StatefulSets (stable identity) | #74 | low | New controller — N services with named volumes |
+| swarmex-pack (Helm equivalent) | #75 | low | CLI tool — Go template → compose YAML |
+
+### Not Feasible Without Docker Engine Changes
+
+These K8s features cannot be replicated with controllers alone:
+
+- **Kernel-level NetworkPolicies** — requires eBPF/iptables per-container (Swarm uses VXLAN without per-container filtering)
+- **CRDs with full API machinery** — would require reimplementing etcd + API server + admission webhooks
+- **L7 service mesh (Istio/Cilium)** — requires dataplane control that Swarm doesn't expose
 
 ## Phase 8: Cloud Node Autoscaling ✅
 
