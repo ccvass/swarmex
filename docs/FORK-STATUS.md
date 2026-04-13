@@ -43,7 +43,7 @@ This is a problem — the forks should contain our improvements, not the coordin
 
 ## Priority Actions
 
-1. **Fork Authentik properly** — clone to `ccvass/swarmex/authentik`, apply the `Attr` patch, build CI/CD pipeline
-2. **Move SeaweedFS entrypoint scripts** to `ccvass/swarmex/seaweedfs-swarm` fork
-3. **Archive inactive forks** — coolify, promswarm, swarm-sync, hca, swarm-autoscaler
-4. **Add CI/CD** to active forks for building and pushing images to `registry.labtau.com`
+1. ~~**Fork Authentik properly**~~ ✅ Done — `ccvass/swarmex/authentik` with patches + CI/CD
+2. ~~**Move SeaweedFS entrypoint scripts**~~ ✅ Done — pushed to `ccvass/swarmex/seaweedfs-swarm`
+3. ~~**Archive inactive forks**~~ ✅ Done — coolify, promswarm, swarm-sync, hca, swarm-autoscaler marked archived
+4. ~~**Add CI/CD**~~ ✅ Done — `.gitlab-ci.yml` added to all 8 swarmex controller repos + authentik fork
