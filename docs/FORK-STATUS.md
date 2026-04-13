@@ -65,3 +65,19 @@ Built and verified 2026-04-12:
 | netpolicy | `ccvass/swarmex/swarmex-netpolicy` | ✅ success | ✅ Cross-namespace network access |
 | rbac | `ccvass/swarmex/swarmex-rbac` | ✅ success | ✅ Docker socket proxy with role-based access |
 | admission | `ccvass/swarmex/swarmex-admission` | ✅ success | ✅ Running, configurable validation rules |
+
+## Advanced Controllers (Phase 3)
+
+Built and verified 2026-04-12:
+
+| Controller | Repo | Pipeline | Verified |
+|:---|:---|:---|:---|
+| vpa | `ccvass/swarmex/swarmex-vpa` | ✅ success | ✅ Watching services, Prometheus queries |
+| traffic | `ccvass/swarmex/swarmex-traffic` | ✅ success | ✅ Applied retry + rate-limit to test-app |
+| federation | `ccvass/swarmex/swarmex-federation` | ✅ success | ✅ Running (needs remote cluster) |
+| api | `ccvass/swarmex/swarmex-api` | ✅ success | ✅ CRUD: POST created resource, GET listed |
+
+## Bug Found During Testing
+
+Remediation controller drained the only manager node (#45), causing 28 services to go Pending.
+Fix: safety check — never drain the last active manager. Pushed and deployed.

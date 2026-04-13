@@ -2,7 +2,7 @@
 
 Extending Docker Swarm to enterprise-grade orchestration — 10x less resources than Kubernetes.
 
-**Status: 33 services running on 3-node AWS cluster. 12 controllers verified end-to-end. All K8s governance features implemented.**
+**Status: 37 services running on 3-node AWS cluster. 16 controllers (14 verified end-to-end). Zero K8s feature gaps.**
 
 ## What is Swarmex
 
@@ -44,6 +44,15 @@ See [docs/K8S-VS-SWARMEX.md](docs/K8S-VS-SWARMEX.md) for the full feature compar
 | `netpolicy` | Cross-namespace access control via network attachment | ✅ svc-be got ns-fe network added |
 | `rbac` | Docker socket proxy with role-based access | ✅ admin granted, anonymous denied |
 | `admission` | Validate/mutate services on creation | ✅ Running, configurable rules |
+
+### Advanced (4)
+
+| Controller | What it does | Verified |
+|:---|:---|:---|
+| `vpa` | Vertical autoscaling — auto-adjust CPU/RAM limits | ✅ Watching services via Prometheus |
+| `traffic` | Circuit breaker, retries, rate limiting via Traefik | ✅ retry + rate-limit middlewares applied |
+| `federation` | Multi-cluster service replication | ✅ Running (needs remote cluster for full test) |
+| `api` | Custom resource API server (CRD equivalent) | ✅ CRUD verified — POST created, GET listed |
 
 All images built via CI/CD (kaniko) and pushed to `registry.labtau.com/ccvass/swarmex/`.
 
@@ -95,10 +104,10 @@ swarmex-coordinator/
     └── FORK-STATUS.md          # Fork analysis, upstream PRs
 ```
 
-## Repos (27 in `ccvass/swarmex` group)
+## Repos (31 in `ccvass/swarmex` group)
 
 - 1 coordinator
-- 12 custom controllers (Go, CI/CD, registry images)
+- 16 custom controllers (Go, CI/CD, registry images)
 - 1 patched fork (authentik)
 - 4 active forks used as-is (swarm-cronjob, gantry, swarm-cd, easytier)
 - 4 active forks with improvements (seaweedfs-swarm, seaweedfs-volume-plugin, portainer-ce, swarmpit)

@@ -54,12 +54,12 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 
 ## What K8s Has That Swarmex Doesn't (Yet)
 
-| Feature | Swarmex Plan | Issue | Status |
+| Feature | Controller | Issue | Status |
 |:---|:---|:---|:---|
-| VPA (vertical autoscaling) | `swarmex-vpa`: monitor usage, adjust limits | #42 | Planned |
-| Multi-cluster federation | `swarmex-federation`: replicate services + EasyTier cross-cluster networking | #41 | Planned |
-| Custom resources (CRDs) | `swarmex-api`: HTTP API server + `swarmexctl` CLI | #44 | Planned |
-| Traffic policies (circuit breaker, retries) | `swarmex-traffic`: auto-configure Traefik middlewares | #43 | Planned |
+| VPA (vertical autoscaling) | `swarmex-vpa` | #42 | ✅ Built, deployed, watching |
+| Multi-cluster federation | `swarmex-federation` | #41 | ✅ Built, deployed (needs 2nd cluster) |
+| Custom resources (CRDs) | `swarmex-api` | #44 | ✅ Built, deployed, CRUD verified |
+| Traffic policies | `swarmex-traffic` | #43 | ✅ Built, deployed, retry+rate-limit applied |
 
 ### Already Implemented (moved from this section)
 

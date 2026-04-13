@@ -91,3 +91,7 @@ swarmex-namespaces/
 swarmex-netpolicy/
 swarmex-rbac/
 swarmex-admission/
+swarmex-vpa/
+swarmex-federation/
+swarmex-traffic/
+swarmex-api/
