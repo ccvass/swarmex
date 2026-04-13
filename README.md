@@ -256,7 +256,6 @@ swarmex-coordinator/
 ├── README.md                  # This file
 ├── ROADMAP.md                 # Implementation phases
 ├── STANDARDS.md               # Go 1.26, patterns, conventions
-├── SWARMEX.md                 # Original vision document
 ├── stacks/                    # Docker Compose stacks
 │   ├── ingress.yml            #   Traefik + Let's Encrypt
 │   ├── observability.yml      #   Prometheus, Grafana, Loki, Tempo, Promtail

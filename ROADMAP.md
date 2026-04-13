@@ -36,7 +36,7 @@ Before building anything, we analyzed what the forked projects already solve.
 ## Custom Services to Build
 
 These are the core Swarmex services that **do not exist** and must be developed from scratch.
-All are built on the **Docker Event Stream** pattern (section 5 of SWARMEX.md) using the Docker Engine SDK.
+All are built on the **Docker Event Stream** pattern using the Docker Engine SDK.
 
 ### Base Layer
 
@@ -44,7 +44,7 @@ All are built on the **Docker Event Stream** pattern (section 5 of SWARMEX.md) u
 |:---|:---|:---|:---|
 | **Event Controller** | `swarmex-event-controller` | Go | Base event stream listener. Connects to `/var/run/docker.sock`, filters `container`, `service`, `node` events, and dispatches to registered handlers. Shared library used by all other controllers. |
 
-### Gap Analysis Services (SWARMEX.md Section 3)
+### Gap Analysis Services
 
 | Service | Repo | Language | Gap Covered | Description |
 |:---|:---|:---|:---|:---|
@@ -54,7 +54,7 @@ All are built on the **Docker Event Stream** pattern (section 5 of SWARMEX.md) u
 | **Vault-Sync-Sidecar** | `swarmex-vault-sync` | Go | Dynamic Secret Injection | Sidecar that reads secrets from OpenBao (Vault OSS fork), injects into container memory via tmpfs at `/run/secrets/`, watches for rotation events and hot-reloads without container restart. |
 | **Nano-Mesh** | `swarmex-nano-mesh` | Go | Lightweight Service Mesh | EasyTier integration wrapper: listens Docker events, auto-provisions/deprovisions EasyTier peers per service. NOT building WireGuard from scratch. |
 
-### Additional Controllers (SWARMEX.md Section 4)
+### Additional Controllers
 
 | Service | Repo | Language | Phase | Description |
 |:---|:---|:---|:---|:---|
