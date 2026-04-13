@@ -54,15 +54,21 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 
 ## What K8s Has That Swarmex Doesn't (Yet)
 
-| Feature | Why it matters | Swarmex Plan | Issue |
+| Feature | Swarmex Plan | Issue | Status |
 |:---|:---|:---|:---|
-| Namespaces | Multi-tenant isolation | `swarmex-namespaces`: auto-create overlay networks per namespace label | #36 |
-| Network policies | Service-level firewall rules | `swarmex-netpolicy`: iptables rules based on service labels | #37 |
-| Granular RBAC | Who can do what on which resources | `swarmex-rbac`: Docker socket proxy with role-based filtering + Authentik | #38 |
-| Admission controllers | Validate/mutate before creation | `swarmex-admission`: post-creation validation + mutation via events | #39 |
-| VPA | Auto-adjust CPU/RAM limits | Possible to build, not yet planned | — |
-| Multi-cluster | Federate across regions | Not possible with Swarm architecture | — |
-| CRDs | Extend the API with custom types | Not applicable — Swarmex uses labels instead | — |
+| VPA (vertical autoscaling) | `swarmex-vpa`: monitor usage, adjust limits | #42 | Planned |
+| Multi-cluster federation | `swarmex-federation`: replicate services + EasyTier cross-cluster networking | #41 | Planned |
+| Custom resources (CRDs) | `swarmex-api`: HTTP API server + `swarmexctl` CLI | #44 | Planned |
+| Traffic policies (circuit breaker, retries) | `swarmex-traffic`: auto-configure Traefik middlewares | #43 | Planned |
+
+### Already Implemented (moved from this section)
+
+| Feature | Controller | Status |
+|:---|:---|:---|
+| Namespaces | `swarmex-namespaces` #36 | ✅ Verified |
+| Network policies | `swarmex-netpolicy` #37 | ✅ Verified |
+| Granular RBAC | `swarmex-rbac` #38 | ✅ Verified |
+| Admission control | `swarmex-admission` #39 | ✅ Verified |
 
 ## What Swarmex Has That K8s Doesn't (Out of the Box)
 
