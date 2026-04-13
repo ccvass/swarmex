@@ -54,3 +54,14 @@ This is a problem — the forks should contain our improvements, not the coordin
 |:---|:---|:---|:---|
 | Attr path navigation fix | goauthentik/authentik | Open | https://github.com/goauthentik/authentik/pull/21557 |
 | Swarm overlay IP entrypoints | cycneuramus/seaweedfs-docker-swarm | Open | https://github.com/cycneuramus/seaweedfs-docker-swarm/pull/3 |
+
+## Governance Controllers (Phase 2)
+
+Built and verified 2026-04-12:
+
+| Controller | Repo | Pipeline | Verified |
+|:---|:---|:---|:---|
+| namespaces | `ccvass/swarmex/swarmex-namespaces` | ✅ success | ✅ Creates overlay networks per namespace |
+| netpolicy | `ccvass/swarmex/swarmex-netpolicy` | ✅ success | ✅ Cross-namespace network access |
+| rbac | `ccvass/swarmex/swarmex-rbac` | ✅ success | ✅ Docker socket proxy with role-based access |
+| admission | `ccvass/swarmex/swarmex-admission` | ✅ success | ✅ Running, configurable validation rules |

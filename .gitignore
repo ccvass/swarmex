@@ -87,3 +87,7 @@ docker-compose.override.yml
 *.sqlite3
 *.db
 .playwright-mcp/
+swarmex-namespaces/
+swarmex-netpolicy/
+swarmex-rbac/
+swarmex-admission/
