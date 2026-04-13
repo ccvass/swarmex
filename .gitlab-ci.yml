@@ -8,11 +8,7 @@ build-authentik:
     entrypoint: [""]
   script:
     - mkdir -p /kaniko/.docker
-    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${REGISTRY_USER}\",\"password\":\"${REGISTRY_PASSWORD}\"}}}"
-      > /kaniko/.docker/config.json
-    - /kaniko/executor
-      --context "${CI_PROJECT_DIR}/docker/authentik"
-      --dockerfile "${CI_PROJECT_DIR}/docker/authentik/Dockerfile"
-      --destination "${CI_REGISTRY_IMAGE}:authentik-patched"
+    - echo "{\"auths\":{\"registry.labtau.com\":{\"username\":\"gitlab+deploy-token-409\",\"password\":\"gldt-zzCjmxDyJxHqaf_BzW7C\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR/docker/authentik --dockerfile $CI_PROJECT_DIR/docker/authentik/Dockerfile --destination registry.labtau.com/ccvass/swarmex/authentik-patched:latest --destination registry.labtau.com/ccvass/swarmex/authentik-patched:2024.8.3
   only:
     - main
