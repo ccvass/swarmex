@@ -52,17 +52,17 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 | Managed cost | $70-150/month (EKS/GKE control plane) | $0 |
 | Total services tested | — | 29 on 3x t3.large (8GB each) |
 
-## What K8s Has That Swarmex Doesn't
+## What K8s Has That Swarmex Doesn't (Yet)
 
-| Feature | Why it matters | Can Swarmex add it? |
-|:---|:---|:---|
-| Namespaces | Multi-tenant isolation | Difficult — fundamental to Swarm architecture |
-| Network policies | Pod-level firewall rules | Possible via iptables controller, complex |
-| Admission controllers | Validate/mutate before creation | Possible via Docker plugin API, limited |
-| CRDs | Extend the API with custom types | Not applicable — Swarmex uses labels |
-| VPA | Auto-adjust CPU/RAM limits | Possible to build, not yet implemented |
-| Multi-cluster | Federate across regions | Not possible with Swarm |
-| Traffic policies | Circuit breaking, retries, fault injection | Possible via Traefik middleware, partial |
+| Feature | Why it matters | Swarmex Plan | Issue |
+|:---|:---|:---|:---|
+| Namespaces | Multi-tenant isolation | `swarmex-namespaces`: auto-create overlay networks per namespace label | #36 |
+| Network policies | Service-level firewall rules | `swarmex-netpolicy`: iptables rules based on service labels | #37 |
+| Granular RBAC | Who can do what on which resources | `swarmex-rbac`: Docker socket proxy with role-based filtering + Authentik | #38 |
+| Admission controllers | Validate/mutate before creation | `swarmex-admission`: post-creation validation + mutation via events | #39 |
+| VPA | Auto-adjust CPU/RAM limits | Possible to build, not yet planned | — |
+| Multi-cluster | Federate across regions | Not possible with Swarm architecture | — |
+| CRDs | Extend the API with custom types | Not applicable — Swarmex uses labels instead | — |
 
 ## What Swarmex Has That K8s Doesn't (Out of the Box)
 
