@@ -86,3 +86,4 @@ docker-compose.override.yml
 # Databases (local)
 *.sqlite3
 *.db
+.playwright-mcp/
