@@ -135,6 +135,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - api-data:/data
 
+  # === Phase 9 (2) ===
+  affinity:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-affinity:latest
+
+  stateful:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-stateful:latest
+
 volumes:
   api-data:
 
