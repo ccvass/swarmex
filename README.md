@@ -195,7 +195,7 @@ graph TB
     EC --> RM
 ```
 
-## Service Inventory (38 services)
+## Service Inventory (39 services)
 
 ```mermaid
 pie title Services by Category
