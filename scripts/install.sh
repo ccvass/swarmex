@@ -232,7 +232,10 @@ info "Stack: tools (Portainer, swarm-cd, swarm-cronjob, gantry)"
 
 sleep 5
 
-# Stack 6: Swarmex controllers
+# Stack 6: Swarmex controllers (LAST — admission must not kill platform services)
+info "Waiting for platform services to stabilize..."
+sleep 60
+
 $SSH "
 cd /tmp/swarmex-coordinator
 docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex

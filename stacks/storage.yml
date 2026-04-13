@@ -1,83 +1,98 @@
-version: "3.8"
-
-# Storage stack for Swarmex
-# Pre-req: run scripts/pre-deploy.sh first
-# Deploy: docker stack deploy -c stacks/storage.yml storage
-
+version: '3.8'
 configs:
   seaweedfs_master_entrypoint:
     file: ../configs/seaweedfs/master-entrypoint.sh
   seaweedfs_filer_entrypoint:
     file: ../configs/seaweedfs/filer-entrypoint.sh
-
 services:
   seaweedfs-master:
     image: chrislusf/seaweedfs:latest
     entrypoint: /bin/sh
-    command: ["/etc/seaweedfs/master-entrypoint.sh"]
+    command:
+    - /etc/seaweedfs/master-entrypoint.sh
     configs:
-      - source: seaweedfs_master_entrypoint
-        target: /etc/seaweedfs/master-entrypoint.sh
-        mode: 0755
+    - source: seaweedfs_master_entrypoint
+      target: /etc/seaweedfs/master-entrypoint.sh
+      mode: 493
     volumes:
-      - master_data:/data
+    - master_data:/data
     deploy:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role == manager]
+        constraints:
+        - node.role == manager
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9333/cluster/status"]
+      test:
+      - CMD
+      - wget
+      - -qO-
+      - http://localhost:9333/cluster/status
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 60s
     networks:
-      - storage
-
+    - storage
   seaweedfs-volume:
     image: chrislusf/seaweedfs:latest
-    command: "volume -mserver=seaweedfs-master:9333 -port=8080 -max=100 -dataCenter=dc1"
+    command: volume -mserver=seaweedfs-master:9333 -port=8080 -max=100 -dataCenter=dc1
     volumes:
-      - volume_data:/data
+    - volume_data:/data
     deploy:
       mode: global
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 256M
     networks:
-      - storage
-
+    - storage
   seaweedfs-filer:
     image: chrislusf/seaweedfs:latest
     entrypoint: /bin/sh
-    command: ["/etc/seaweedfs/filer-entrypoint.sh"]
+    command:
+    - /etc/seaweedfs/filer-entrypoint.sh
     configs:
-      - source: seaweedfs_filer_entrypoint
-        target: /etc/seaweedfs/filer-entrypoint.sh
-        mode: 0755
+    - source: seaweedfs_filer_entrypoint
+      target: /etc/seaweedfs/filer-entrypoint.sh
+      mode: 493
     volumes:
-      - filer_data:/data
+    - filer_data:/data
     deploy:
       mode: replicated
       replicas: 1
       labels:
-        traefik.enable: "true"
-        traefik.http.routers.seaweedfs.rule: "Host(`storage.${DOMAIN:-localhost}`)"
-        traefik.http.routers.seaweedfs.tls.certresolver: "le"
-        traefik.http.services.seaweedfs.loadbalancer.server.port: "8888"
+        traefik.enable: 'true'
+        traefik.http.routers.seaweedfs.rule: Host(`storage.${DOMAIN:-localhost}`)
+        traefik.http.routers.seaweedfs.tls.certresolver: le
+        traefik.http.services.seaweedfs.loadbalancer.server.port: '8888'
+        team: platform
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8888/"]
+      test:
+      - CMD
+      - wget
+      - -qO-
+      - http://localhost:8888/
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 60s
     networks:
-      - storage
-      - traefik-public
-
+    - storage
+    - traefik-public
 volumes:
-  master_data:
-  volume_data:
-  filer_data:
-
+  master_data: null
+  volume_data: null
+  filer_data: null
 networks:
   storage:
     external: true
