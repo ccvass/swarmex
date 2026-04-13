@@ -23,7 +23,7 @@ echo "║           SWARMEX INSTALLER v1.0                 ║"
 echo "║  Enterprise orchestration for Docker Swarm       ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
-echo "This script deploys 39 services (17 controllers + platform stack)"
+echo "This script deploys 35 services (16 controllers + platform stack)"
 echo "on your existing Docker Swarm cluster."
 echo ""
 
@@ -151,10 +151,14 @@ ask "Proceed with installation? [Y/n]: " CONFIRM
 # ═══════════════════════════════════════════════════════════════════════
 
 info "Logging into registry on all nodes..."
-NODES=$($SSH "docker node ls --format '{{.Hostname}}'")
-# Login on manager
+WORKER_IPS=$($SSH "docker node ls --format '{{.Hostname}}' | xargs -I{} docker node inspect {} --format '{{.Status.Addr}}'")
+for NODE_IP in $WORKER_IPS; do
+  ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no -i "$SSH_KEY" "$SSH_USER@$NODE_IP" \
+    "echo '$REG_PASS' | docker login $REGISTRY -u '$REG_USER' --password-stdin" >/dev/null 2>&1 || true
+done
+# Also login on manager
 $SSH "echo '$REG_PASS' | docker login $REGISTRY -u '$REG_USER' --password-stdin" >/dev/null 2>&1
-info "Registry login OK"
+info "Registry login OK (all nodes)"
 
 # ─── Create secrets ───────────────────────────────────────────────────
 info "Creating Docker secrets..."
@@ -240,7 +244,7 @@ $SSH "
 cd /tmp/swarmex-coordinator
 docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
 " >/dev/null 2>&1
-info "Stack: swarmex (17 controllers)"
+info "Stack: swarmex (16 controllers)"
 
 # ─── Cluster scaler (optional) ───────────────────────────────────────
 if [ -n "$CS_PROVIDER" ]; then

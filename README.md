@@ -2,7 +2,7 @@
 
 Enterprise-grade orchestration for Docker Swarm — closing every feature gap with Kubernetes via lightweight Go controllers configured through Docker labels.
 
-**39 services running on a 3-node cluster. 17 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). 100% open source.**
+**35 services running on a 3-node cluster. 17 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). Reproducible install from scratch — 35/35 on first deploy. 100% open source.**
 
 ## Why Swarmex
 
@@ -195,28 +195,26 @@ graph TB
     EC --> RM
 ```
 
-## Service Inventory (39 services)
+## Service Inventory (35 services)
 
 ```mermaid
 pie title Services by Category
-    "Swarmex Controllers" : 17
-    "Observability" : 9
-    "Security" : 4
+    "Swarmex Controllers" : 16
+    "Observability" : 7
+    "Security" : 5
     "Storage" : 3
     "Tools" : 4
     "Ingress" : 1
-    "Test App" : 1
 ```
 
 | Stack | Services | Replicas |
 |:---|:---|:---|
 | Ingress | Traefik | 1 |
-| Observability | Prometheus, Grafana, Loki, Tempo, AlertManager, Promtail (×3), cAdvisor (×3), Node Exporter (×3) | 9 services, 15 containers |
+| Observability | Prometheus, Grafana, Loki, Tempo, AlertManager, cAdvisor (×3), Node Exporter (×3) | 7 services, 13 containers |
 | Security | Authentik (server + worker), PostgreSQL, Valkey, OpenBao | 5 |
 | Storage | SeaweedFS master, volume (×3), filer | 3 services, 5 containers |
 | Tools | Portainer CE, swarm-cd, swarm-cronjob, gantry | 4 |
-| Swarmex | 17 controllers | 17 |
-| Test | nginx test-app | 1 (2 replicas) |
+| Swarmex | 16 controllers (event-controller through api) | 16 |
 
 ## Resource Comparison
 
@@ -227,7 +225,6 @@ pie title Services by Category
 | Setup time | 30–60 min | 2 min (`docker swarm init`) |
 | Config per service | 3–5 YAML files | 1 Compose file + labels |
 | Managed service cost | $70–150/month | $0 |
-| Services running | — | 38 on 3× t3.large (8 GB each) |
 | Total controller binaries | — | 16 × ~8 MB = 128 MB |
 
 ## Test Environment
@@ -243,7 +240,7 @@ All features were tested on a live AWS cluster, not in simulation:
 | SSL | Let's Encrypt wildcard (Cloudflare DNS challenge) |
 | Registry | Self-hosted GitLab at `registry.labtau.com` |
 | CI/CD | GitLab CI with kaniko (17 pipelines) |
-| Services | 39 running simultaneously on 3 nodes |
+| Services | 35 running simultaneously on 3 nodes |
 | Uptime | Cluster survived remediation drain, controller restarts, and stress tests |
 
 Cross-cloud federation was tested with a temporary 3-node GCP cluster (e2-medium, us-central1-a) — created, tested, and deleted in the same session.
@@ -260,7 +257,7 @@ cd swarmex-coordinator
 bash scripts/install.sh
 ```
 
-The installer asks for your manager IP, domain, credentials, and optional cloud provider for autoscaling. It deploys all 6 stacks, creates secrets, and verifies the installation. Takes ~5 minutes.
+The installer asks for your manager IP, domain, credentials, and optional cloud provider for autoscaling. It handles registry login, secrets, networks, configs, and deploys all 6 stacks in the correct order (platform first, controllers last). Takes ~5 minutes for 35/35 services.
 
 ### Manual Install
 
@@ -272,17 +269,32 @@ cd swarmex-coordinator
 # Initialize Swarm (if not already)
 docker swarm init
 
+# Login to registry on ALL nodes
+echo "<token>" | docker login registry.labtau.com -u "gitlab+deploy-token-409" --password-stdin
+
+# Create Docker secrets
+echo -n "<db-password>" | docker secret create authentik_db_pw -
+echo -n "<secret-key>" | docker secret create authentik_secret -
+echo -n "<grafana-pw>" | docker secret create grafana_admin_pw -
+echo -n "<cf-token>" | docker secret create cloudflare_api_token -
+echo -n "<bao-token>" | docker secret create openbao_root_token -
+
 # Create overlay networks and configs
 bash scripts/pre-deploy.sh
 
-# Deploy stacks in order
+# Deploy stacks IN ORDER (swarmex MUST be last)
 docker stack deploy -c stacks/ingress.yml --with-registry-auth ingress
 docker stack deploy -c stacks/observability.yml --with-registry-auth observability
 docker stack deploy -c stacks/security.yml --with-registry-auth security
 docker stack deploy -c stacks/storage.yml --with-registry-auth storage
 docker stack deploy -c stacks/tools.yml --with-registry-auth tools
+
+# Wait 60s for platform services to stabilize before deploying controllers
+sleep 60
 docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
 ```
+
+> **Important:** The swarmex stack contains the admission controller which enforces `team` label and `memory` limit on all services. If deployed before platform stacks are running, admission will remove them. Always deploy swarmex last.
 
 ## Project Structure
 

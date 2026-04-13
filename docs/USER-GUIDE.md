@@ -110,12 +110,14 @@ cd swarmex-coordinator
 
 ### Login to Container Registry
 
-On every node:
+On **every node** (manager and all workers):
 
 ```bash
 echo "<deploy-token-password>" | docker login registry.labtau.com \
   -u "gitlab+deploy-token-409" --password-stdin
 ```
+
+If you skip a node, services scheduled there will fail with "image not found".
 
 ### Create Networks and Configs
 
@@ -127,25 +129,32 @@ This creates the overlay networks (`monitoring`, `traefik-public`, `security`, `
 
 ### Create Docker Secrets
 
+Secret names must match exactly — the stacks reference these specific names:
+
 ```bash
-# Authentik
-echo -n "<db-password>" | docker secret create authentik_db_password -
-echo -n "<secret-key>" | docker secret create authentik_secret_key -
+# Authentik (note: authentik_db_pw, NOT authentik_db_password)
+echo -n "<db-password>" | docker secret create authentik_db_pw -
+echo -n "<secret-key>" | docker secret create authentik_secret -
+
+# Grafana
+echo -n "<grafana-password>" | docker secret create grafana_admin_pw -
+
+# Cloudflare (for DNS challenge SSL)
+echo -n "<cloudflare-api-token>" | docker secret create cloudflare_api_token -
 
 # OpenBao
 echo -n "<root-token>" | docker secret create openbao_root_token -
-echo -n "<unseal-key>" | docker secret create openbao_unseal_key -
 ```
 
 ### Deploy Stacks (In Order)
 
-The order matters — each stack depends on the previous ones.
+The order matters — each stack depends on the previous ones. The swarmex stack **must be deployed last** because it contains the admission controller, which enforces `team` label and `memory` limit on all services. If admission starts before platform services are running, it will remove them.
 
 ```bash
 # 1. Ingress (Traefik — SSL termination, routing)
 docker stack deploy -c stacks/ingress.yml --with-registry-auth ingress
 
-# 2. Observability (Prometheus, Grafana, Loki, Tempo, Promtail)
+# 2. Observability (Prometheus, Grafana, Loki, Tempo)
 docker stack deploy -c stacks/observability.yml --with-registry-auth observability
 
 # 3. Security (Authentik SSO, OpenBao secrets)
@@ -157,11 +166,14 @@ docker stack deploy -c stacks/storage.yml --with-registry-auth storage
 # 5. Tools (Portainer, swarm-cd, swarm-cronjob, gantry)
 docker stack deploy -c stacks/tools.yml --with-registry-auth tools
 
-# 6. Swarmex Controllers (all 16)
+# 6. WAIT for platform services to stabilize
+sleep 60
+
+# 7. Swarmex Controllers (LAST — admission enforces policies)
 docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
 ```
 
-Wait 2–3 minutes between stacks for services to stabilize.
+All platform stacks (ingress through tools) include `team: platform` labels and memory limits so they pass admission validation. Your application stacks need these too — see [Section 5](#5-deploying-your-first-app).
 
 ## 4. Verifying the Installation
 
@@ -169,7 +181,13 @@ Wait 2–3 minutes between stacks for services to stabilize.
 
 ```bash
 docker service ls
-# All services should show matching replicas (e.g., 1/1, 3/3)
+# All 35 services should show matching replicas (e.g., 1/1, 3/3)
+# Expected: 35/35 on a fresh install
+
+# Quick count
+total=$(docker service ls -q | wc -l)
+running=$(docker service ls --format '{{.Replicas}}' | grep -v '0/' | wc -l)
+echo "$running/$total services running"
 ```
 
 ### Check Web UIs
@@ -198,7 +216,7 @@ done
 
 ### Minimum Viable Compose File
 
-Swarmex admission requires every service to have a `memory limit` and a `team` label:
+Swarmex admission requires every service to have a `memory limit` and a `team` label in `deploy.labels`. Services missing either will be removed automatically.
 
 ```yaml
 # my-app.yml
@@ -213,18 +231,12 @@ services:
           memory: 256M
           cpus: "0.5"
       labels:
+        team: my-team    # Required by admission (must be in deploy.labels)
         # Traefik routing
         traefik.enable: "true"
         traefik.http.routers.myapp.rule: "Host(`myapp.<domain>`)"
         traefik.http.routers.myapp.tls.certresolver: "le"
         traefik.http.services.myapp.loadbalancer.server.port: "8080"
-    labels:
-      team: my-team    # Required by admission
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
     networks:
       - traefik-public
 
@@ -232,6 +244,8 @@ networks:
   traefik-public:
     external: true
 ```
+
+> **Healthcheck note:** If your image is distroless (no shell, no wget, no curl), do not add a Docker healthcheck — Docker will just check if the process is running. For images with a shell, use `CMD-SHELL` with a fallback: `["CMD-SHELL", "wget -qO- http://localhost:8080/health || curl -sf http://localhost:8080/health || exit 1"]`
 
 ### Deploy
 
@@ -833,6 +847,8 @@ done
 ## 15. Admission Rules
 
 Swarmex enforces rules on every new service (including `docker stack deploy`). Services that fail validation are automatically removed.
+
+All platform stacks (ingress, observability, security, storage, tools) already include `team: platform` and memory limits, so they pass admission. You only need to worry about your own application stacks.
 
 ### Default Rules
 
