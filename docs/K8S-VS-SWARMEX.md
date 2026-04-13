@@ -41,6 +41,7 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 | SSO / Identity | ⚠️ Needs Dex/Keycloak | ✅ Authentik | Equivalent |
 | Web UI | ⚠️ Needs Dashboard/Lens | ✅ Portainer CE + swarm-cd | Equivalent |
 | Managed offerings | ✅ EKS, GKE, AKS | ❌ Self-managed only | K8s advantage |
+| Cluster autoscaling | ✅ Cluster Autoscaler | ✅ `swarmex-cluster-scaler` | Verified: AWS 3→5→3 nodes |
 
 **Result: 0 impossible gaps. Every K8s feature has a Swarmex equivalent, verified with evidence.**
 

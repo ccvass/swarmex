@@ -21,8 +21,9 @@ Complete guide from cluster setup to deploying and operating applications on Swa
 15. [Admission Rules](#15-admission-rules)
 16. [RBAC and Authentication](#16-rbac-and-authentication)
 17. [Updating Swarmex](#17-updating-swarmex)
-18. [Traefik High Availability and Multiple Domains](#18-traefik-high-availability-and-multiple-domains)
-19. [Troubleshooting](#19-troubleshooting)
+18. [Automatic Cloud Node Scaling](#18-automatic-cloud-node-scaling)
+19. [Traefik High Availability and Multiple Domains](#19-traefik-high-availability-and-multiple-domains)
+20. [Troubleshooting](#20-troubleshooting)
 
 ## 1. Infrastructure Setup
 
@@ -971,7 +972,110 @@ docker stack deploy -c stacks/observability.yml --with-registry-auth observabili
 # Repeat for other stacks as needed
 ```
 
-## 18. Traefik High Availability and Multiple Domains
+## 18. Automatic Cloud Node Scaling
+
+### How It Works
+
+The cluster-scaler controller monitors overall cluster CPU usage and automatically provisions or terminates cloud instances:
+
+1. Every 30 seconds, queries Prometheus: `avg(1 - rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100`
+2. If CPU exceeds threshold and total nodes < max: provisions a new instance via the configured cloud provider
+3. The instance installs Docker and joins the Swarm automatically via user-data/cloud-init
+4. If CPU drops below threshold and managed workers > min: drains the youngest auto-provisioned node, waits 30s for task migration, removes from Swarm, terminates the instance
+5. Managed nodes are persisted in bbolt — survives controller restarts
+
+### Protections
+
+- Cooldown: 5 min after scale-up, 10 min after scale-down
+- New node protection: nodes younger than 10 minutes won't be removed
+- Only manages its own nodes: manually added nodes are never touched
+- Persistence: managed node list stored in bbolt at `/data/cluster-scaler.db`
+
+### Configuration
+
+All configuration is in a YAML file mounted at `/etc/swarmex/cluster-scaler.yaml`:
+
+```yaml
+swarm_token: "SWMTKN-1-xxxxx"
+manager_ip: "10.0.0.1"
+min_nodes: 2
+max_nodes: 10
+scale_up_cpu: 80
+scale_down_cpu: 15
+eval_interval: "30s"
+cooldown_up: "5m"
+cooldown_down: "10m"
+prometheus_url: "http://observability_prometheus:9090"
+
+providers:
+  aws:
+    region: "us-east-1"
+    key_name: "my-key"
+    security_group: "sg-xxxxxxxx"
+    subnet_id: "subnet-xxxxxxxx"
+    template:
+      instance_type: "t3.large"
+      image: "ami-xxxxxxxxx"
+      disk_gb: 30
+
+  # Multiple providers = round-robin provisioning
+  # gcp:
+  #   project: "my-project"
+  #   zone: "us-central1-a"
+  #   template:
+  #     instance_type: "e2-medium"
+  #     image: "ubuntu-2404-lts-amd64"
+  #     disk_gb: 30
+  # azure:
+  #   resource_group: "swarmex-rg"
+  #   location: "eastus"
+  #   vnet: "swarmex-vnet"
+  #   subnet: "default"
+  #   template:
+  #     instance_type: "Standard_B2s"
+  #     image: "Canonical:ubuntu-24_04-lts:server:latest"
+  #     disk_gb: 30
+  # digitalocean:
+  #   region: "nyc1"
+  #   ssh_key_id: "12345678"
+  #   template:
+  #     instance_type: "s-2vcpu-4gb"
+  #     image: "ubuntu-24-04-x64"
+  #     disk_gb: 50
+```
+
+### Supported Providers
+
+| Provider | CLI Required | Instance Types | Image Format |
+|:---|:---|:---|:---|
+| AWS | `aws` | `t3.large`, `m5.xlarge` | AMI ID |
+| GCP | `gcloud` | `e2-medium`, `n2-standard-4` | Image family |
+| Azure | `az` | `Standard_B2s`, `Standard_D4s_v3` | URN |
+| DigitalOcean | `doctl` | `s-2vcpu-4gb`, `s-4vcpu-8gb` | Slug |
+
+### Verified: Full Cycle on AWS
+
+```
+15:20  CPU 72% > 70% → provisioned i-05368af8cf75693c3 (t3.medium)
+15:21  Controller restarted → "restored managed nodes, count=1" (bbolt works)
+15:22  CPU 89% → provisioned second node (managed=2, cluster=5 nodes)
+15:24  Stress removed, CPU dropping: 89→50→13→9%
+15:30  Node age > 10min, CPU < 15% → drained + terminated first node
+15:35  → drained + terminated second node
+15:36  Back to 3 original nodes, managed=0
+```
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_cluster-scaler) --tail 20
+# "cluster eval" — periodic with worker count, CPU%, managed count
+# "provisioning node" / "node provisioned" — scale-up
+# "restored managed nodes" — bbolt loaded on startup
+# "node drained" / "node terminated" — scale-down
+```
+
+## 19. Traefik High Availability and Multiple Domains
 
 ### How HA Works
 
@@ -1073,7 +1177,7 @@ swarmex.example.com  A  44.203.57.80     (node 3)
 
 Cloudflare round-robins between healthy IPs. If a node goes down, Cloudflare removes it from rotation within ~30 seconds.
 
-## 19. Troubleshooting
+## 20. Troubleshooting
 
 ### Service Won't Start
 

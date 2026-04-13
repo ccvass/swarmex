@@ -320,3 +320,19 @@ Completed 2026-04-13.
 
 38 services running. 16 controllers verified end-to-end. Zero K8s feature gaps.
 Cross-cloud federation tested (AWS ↔ GCP). 2 upstream PRs submitted.
+
+## Phase 8: Cloud Node Autoscaling ✅
+
+Completed 2026-04-13. Full cycle verified on AWS.
+
+| Feature | Status |
+|:---|:---|
+| cluster-scaler controller | ✅ Built (13MB binary) |
+| AWS provider | ✅ Verified: 3→5→3 nodes |
+| GCP provider | ✅ Code ready |
+| Azure provider | ✅ Code ready |
+| DigitalOcean provider | ✅ Code ready |
+| bbolt persistence | ✅ Survives restart (verified) |
+| Scale-up (CPU > 80%) | ✅ EC2 instances created + joined Swarm |
+| Scale-down (CPU < 15%) | ✅ Nodes drained + EC2 terminated |
+| Multi-provider round-robin | ✅ Implemented |

@@ -5,7 +5,7 @@ Status of each forked repository and changes made.
 ## Summary
 
 - **31 repositories** in `ccvass/swarmex` GitLab group
-- **16 custom controllers** built from scratch in Go
+- **17 custom controllers** built from scratch in Go
 - **1 patched fork** (Authentik) with CI/CD pipeline
 - **4 active forks** used as-is (swarm-cronjob, gantry, swarm-cd, EasyTier)
 - **4 active forks** with improvements (SeaweedFS Swarm, SeaweedFS volume plugin, Portainer CE, Swarmpit)
@@ -34,6 +34,7 @@ All built in Go 1.26, ~8MB binaries, CI/CD via kaniko, images at `registry.labta
 | traffic | ✅ | ✅ | ✅ retry + rate-limit |
 | federation | ✅ | ✅ | ✅ AWS→GCP cross-cloud |
 | api | ✅ | ✅ | ✅ CRUD + bbolt persistence |
+| cluster-scaler | ✅ | ✅ | ✅ AWS scale-up/down verified, bbolt persistence |
 
 ## Patched Fork
 

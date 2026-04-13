@@ -2,7 +2,7 @@
 
 Enterprise-grade orchestration for Docker Swarm — closing every feature gap with Kubernetes via lightweight Go controllers configured through Docker labels.
 
-**38 services running on a 3-node cluster. 17 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). 100% open source.**
+**39 services running on a 3-node cluster. 17 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). 100% open source.**
 
 ## Why Swarmex
 
@@ -199,7 +199,7 @@ graph TB
 
 ```mermaid
 pie title Services by Category
-    "Swarmex Controllers" : 16
+    "Swarmex Controllers" : 17
     "Observability" : 9
     "Security" : 4
     "Storage" : 3
@@ -215,7 +215,7 @@ pie title Services by Category
 | Security | Authentik (server + worker), PostgreSQL, Valkey, OpenBao | 5 |
 | Storage | SeaweedFS master, volume (×3), filer | 3 services, 5 containers |
 | Tools | Portainer CE, swarm-cd, swarm-cronjob, gantry | 4 |
-| Swarmex | 16 controllers | 16 |
+| Swarmex | 17 controllers | 17 |
 | Test | nginx test-app | 1 (2 replicas) |
 
 ## Resource Comparison

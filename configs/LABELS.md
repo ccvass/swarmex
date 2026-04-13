@@ -144,3 +144,20 @@ users:
 ```
 
 Authentication priority: JWT Bearer token → X-Authentik-Username header → X-Swarmex-User header → anonymous.
+
+## Cluster Scaler (Config File)
+
+Cluster-scaler is configured via YAML file, not labels. Mounted at `/etc/swarmex/cluster-scaler.yaml`.
+
+See `configs/cluster-scaler/config.example.yaml` for a complete example with all 4 providers (AWS, GCP, Azure, DigitalOcean).
+
+Key settings:
+
+| Setting | Default | Description |
+|:---|:---|:---|
+| `scale_up_cpu` | `80` | Cluster CPU% to trigger node provisioning |
+| `scale_down_cpu` | `20` | Cluster CPU% to trigger node termination |
+| `min_nodes` | `2` | Minimum worker nodes (never scale below) |
+| `max_nodes` | `10` | Maximum total nodes (never scale above) |
+| `cooldown_up` | `5m` | Wait after provisioning before next scale-up |
+| `cooldown_down` | `10m` | Wait after terminating before next scale-down |
