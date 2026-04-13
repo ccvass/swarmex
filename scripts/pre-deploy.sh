@@ -5,7 +5,7 @@ set -euo pipefail
 # Run this ONCE on a Swarm manager node from the swarmex-coordinator directory.
 
 echo "Creating overlay networks..."
-for net in traefik-public monitoring security storage swarmex_swarmex; do
+for net in traefik-public monitoring security storage swarmex; do
   if docker network inspect "$net" >/dev/null 2>&1; then
     echo "  ✓ $net (exists)"
   else

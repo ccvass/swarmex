@@ -162,6 +162,7 @@ $SSH "
 echo -n '$AK_DB_PASS' | docker secret create authentik_db_pw - 2>/dev/null || true
 echo -n '$AK_SECRET' | docker secret create authentik_secret - 2>/dev/null || true
 echo -n '$GF_PASS' | docker secret create grafana_admin_pw - 2>/dev/null || true
+echo -n 'init-pending' | docker secret create openbao_root_token - 2>/dev/null || true
 " >/dev/null
 if [ -n "$CF_TOKEN" ]; then
   $SSH "echo -n '$CF_TOKEN' | docker secret create cloudflare_api_token - 2>/dev/null || true" >/dev/null
