@@ -2,7 +2,7 @@
 
 Enterprise-grade orchestration for Docker Swarm — closing every feature gap with Kubernetes via lightweight Go controllers configured through Docker labels.
 
-**35 services running on a 3-node cluster. 17 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). Reproducible install from scratch — 35/35 on first deploy. 100% open source.**
+**37 services running on a 3-node cluster. 19 controllers + 1 CLI tool verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). Reproducible install from scratch — 37/37 on first deploy. 100% open source.**
 
 ## Why Swarmex
 
@@ -74,7 +74,7 @@ No CRDs. No operators. No YAML complexity. Just labels.
 
 ## Controllers
 
-Swarmex has 16 controllers organized in three tiers. Each is a single Go binary (~8MB), reads configuration from Docker service labels, and exposes `/health` and `/metrics` endpoints.
+Swarmex has 18 controllers organized in four tiers, plus a CLI packaging tool. Each controller is a single Go binary (~8MB), reads configuration from Docker service labels, and exposes `/health` and `/metrics` endpoints.
 
 ### Core — Workload Management
 
@@ -83,8 +83,8 @@ Swarmex has 16 controllers organized in three tiers. Each is a single Go binary 
 | `event-controller` | Listens to Docker event stream, dispatches to all controllers | Real-time create/update/health events captured |
 | `scaler` | Horizontal autoscaling based on CPU/RAM via Prometheus | test-app scaled 2→5→2 replicas under load |
 | `gatekeeper` | Readiness probes — enables Traefik routing only when healthy | Log: "service READY, enabling Traefik" |
-| `remediation` | Self-healing escalation: restart → force-update → drain node | Drained manager node on persistent failures (safety: never drains last manager) |
-| `deployer` | Blue/green deployments via parallel service + Traefik weights | Green service created with httpd:alpine |
+| `remediation` | Self-healing with disruption budgets: restart → force-update → drain node | Drained manager node on persistent failures; drain blocked by min-available budget |
+| `deployer` | Blue/green and canary deployments via parallel service + Traefik weights | Green service created; canary 0→25→50→75→100%; rollback on error threshold |
 | `vault-sync` | Syncs secrets from OpenBao to containers, supports hot-reload | 2 secrets synced from OpenBao KV v2 |
 | `operator-db` | Database health monitoring and automatic failover | PostgreSQL failover triggered on container kill, recovered to 1/1 |
 | `nano-mesh` | Service mesh peer registration via EasyTier (WireGuard) | Peers registered for mesh-enabled services |
@@ -96,7 +96,7 @@ Swarmex has 16 controllers organized in three tiers. Each is a single Go binary 
 | `namespaces` | Creates isolated overlay networks per namespace label | ns-frontend, ns-backend, ns-production networks created |
 | `netpolicy` | Cross-namespace access control via network attachment | svc-be granted access to ns-frontend network |
 | `rbac` | Docker socket proxy with role-based access, JWT support | JWT token → akadmin → admin role → granted; anonymous → denied |
-| `admission` | Validates and mutates services on creation | Denied service without memory limit; denied without team label; auto-added `managed-by: swarmex` label; works with `docker stack deploy` |
+| `admission` | Validates/mutates services on creation + namespace resource quotas | Denied without memory/team; auto-added labels; quota exceeded → denied |
 
 ### Advanced — Enterprise Features
 
@@ -107,6 +107,14 @@ Swarmex has 16 controllers organized in three tiers. Each is a single Go binary 
 | `federation` | Multi-cluster service replication across clouds | **AWS→GCP cross-cloud replication verified** (see below) |
 | `api` | Custom resource API server with persistent storage (bbolt) | CRUD verified; resources survive container restart |
 | `cluster-scaler` | Auto-provision/deprovision cloud nodes (AWS/GCP/Azure/DO) | ✅ AWS scale-up verified: 3→5 nodes on CPU spike |
+
+### Phase 9 — Closing K8s Gaps
+
+| Controller | Purpose | Verified With |
+|:---|:---|:---|
+| `affinity` | Service co-location and anti-affinity via placement constraints | ✅ colocate: same node; avoid: different node; no event loop |
+| `stateful` | StatefulSet-like behavior — stable identity, ordered deploy, named volumes | ✅ 3 instances (svc-0/1/2) created in order, each with own volume |
+| `swarmex-pack` (CLI) | Helm-like stack packaging — template + values → deploy | ✅ render with overrides + install → stack 2/2 running |
 
 ## Cross-Cloud Federation
 
@@ -195,11 +203,11 @@ graph TB
     EC --> RM
 ```
 
-## Service Inventory (35 services)
+## Service Inventory (37 services)
 
 ```mermaid
 pie title Services by Category
-    "Swarmex Controllers" : 16
+    "Swarmex Controllers" : 18
     "Observability" : 7
     "Security" : 5
     "Storage" : 3
@@ -214,7 +222,7 @@ pie title Services by Category
 | Security | Authentik (server + worker), PostgreSQL, Valkey, OpenBao | 5 |
 | Storage | SeaweedFS master, volume (×3), filer | 3 services, 5 containers |
 | Tools | Portainer CE, swarm-cd, swarm-cronjob, gantry | 4 |
-| Swarmex | 16 controllers (event-controller through api) | 16 |
+| Swarmex | 18 controllers (event-controller through stateful) | 18 |
 
 ## Resource Comparison
 
@@ -222,8 +230,8 @@ pie title Services by Category
 |:---|:---|:---|
 | Control plane RAM | 1.5–2 GB | ~100 MB (embedded in Docker) |
 | Control plane components | 5 (etcd, apiserver, scheduler, controller-manager, coredns) | 0 |
-| Total platform RAM | 4–6 GB (control plane + monitoring) | 1.8 GB (35 services + monitoring) |
-| 16 controllers total | — | ~100 MB (6 MB each) |
+| Total platform RAM | 4–6 GB (control plane + monitoring) | 1.8 GB (37 services + monitoring) |
+| 18 controllers total | — | ~120 MB (6 MB each) |
 | Idle cluster CPU | 15–25% | ~19% |
 | Setup time | 30–60 min | ~5 min |
 | Config per service | 3–5 YAML files | 1 Compose file + labels |
@@ -245,13 +253,13 @@ Swarmex closes most feature gaps with Kubernetes, but K8s has real advantages in
 
 | Area | Kubernetes Advantage | Swarmex Approach |
 |:---|:---|:---|
-| **Ecosystem** | Thousands of Helm charts, operators, CRDs ready to use | 16 custom controllers — covers core needs but no third-party ecosystem |
-| **Advanced scheduling** | Affinity/anti-affinity, taints/tolerations, topology spread, pod disruption budgets | Basic placement constraints only |
-| **Stateful workloads** | StatefulSets with stable identity, dynamic PV provisioning | No native equivalent — use named volumes + placement constraints |
-| **Multi-tenancy** | Namespaces with ResourceQuotas, LimitRanges, kernel-level NetworkPolicies | Simulated via controllers — not kernel-level enforcement |
+| **Ecosystem** | Thousands of Helm charts, operators, CRDs ready to use | 18 custom controllers + swarmex-pack CLI for templated deploys |
+| **Advanced scheduling** | Affinity/anti-affinity, taints/tolerations, topology spread, pod disruption budgets | ✅ Affinity controller (colocate/avoid/spread) + disruption budgets in remediation |
+| **Stateful workloads** | StatefulSets with stable identity, dynamic PV provisioning | ✅ Stateful controller — ordered deploy, named volumes per instance |
+| **Multi-tenancy** | Namespaces with ResourceQuotas, LimitRanges, kernel-level NetworkPolicies | ✅ Namespace quotas (max_memory, max_services) in admission — not kernel-level |
 | **Service mesh** | Istio, Linkerd, Cilium (eBPF) — production-proven at scale | nano-mesh (EasyTier/WireGuard) — simpler but less mature |
 | **Enterprise adoption** | Managed services (EKS, GKE, AKS), certifications, commercial support, large talent pool | Docker Swarm is in maintenance mode — smaller community |
-| **Canary deployments** | Native canary with exact traffic percentages, rollback by metrics | Blue/green only — no weighted canary |
+| **Canary deployments** | Native canary with exact traffic percentages, rollback by metrics | ✅ Canary strategy with weighted Traefik shifting + auto-rollback on error rate |
 | **API extensibility** | CRDs with validation webhooks, custom controllers, full API machinery | Labels-based — simpler but less powerful |
 
 **Choose Kubernetes when:** you need a large ecosystem of third-party operators, advanced scheduling for complex stateful workloads, kernel-level network isolation, or your organization already has K8s expertise and managed service budgets.
@@ -271,7 +279,7 @@ All features were tested on a live AWS cluster, not in simulation:
 | SSL | Let's Encrypt wildcard (Cloudflare DNS challenge) |
 | Registry | Self-hosted GitLab at `registry.labtau.com` |
 | CI/CD | GitLab CI with kaniko (17 pipelines) |
-| Services | 35 running simultaneously on 3 nodes |
+| Services | 37 running simultaneously on 3 nodes |
 | Uptime | Cluster survived remediation drain, controller restarts, and stress tests |
 
 Cross-cloud federation was tested with a temporary 3-node GCP cluster (e2-medium, us-central1-a) — created, tested, and deleted in the same session.
@@ -340,7 +348,7 @@ swarmex-coordinator/
 │   ├── security.yml           #   Authentik, OpenBao, PostgreSQL, Valkey
 │   ├── storage.yml            #   SeaweedFS (master, volume, filer)
 │   ├── tools.yml              #   Portainer, swarm-cd, swarm-cronjob, gantry
-│   └── swarmex.yml            #   All 16 controllers
+│   └── swarmex.yml            #   All 18 controllers
 ├── configs/                   # Service configurations
 │   ├── prometheus/            #   Scrape configs + alert rules
 │   ├── grafana/               #   Datasource provisioning
@@ -370,7 +378,8 @@ swarmex-coordinator/
 All hosted in the `ccvass/swarmex` GitLab group with CI/CD pipelines building container images via kaniko.
 
 - **1** coordinator (this repo)
-- **16** custom controllers (Go, ~8MB each)
+- **18** custom controllers (Go, ~8MB each)
+- **1** CLI tool (swarmex-pack — Helm-like packaging)
 - **1** patched fork (Authentik — Attr dataclass fix)
 - **4** active forks as-is (swarm-cronjob, gantry, swarm-cd, EasyTier)
 - **4** active forks with improvements (SeaweedFS Swarm, SeaweedFS volume plugin, Portainer CE, Swarmpit)

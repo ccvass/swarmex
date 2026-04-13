@@ -23,7 +23,13 @@ Complete guide from cluster setup to deploying and operating applications on Swa
 17. [Updating Swarmex](#17-updating-swarmex)
 18. [Automatic Cloud Node Scaling](#18-automatic-cloud-node-scaling)
 19. [Traefik High Availability and Multiple Domains](#19-traefik-high-availability-and-multiple-domains)
-20. [Troubleshooting](#20-troubleshooting)
+20. [Canary Deployments](#20-canary-deployments)
+21. [Service Affinity and Anti-Affinity](#21-service-affinity-and-anti-affinity)
+22. [Disruption Budgets](#22-disruption-budgets)
+23. [Namespace Resource Quotas](#23-namespace-resource-quotas)
+24. [Stateful Services](#24-stateful-services)
+25. [Swarmex Pack (Helm-like Packaging)](#25-swarmex-pack-helm-like-packaging)
+26. [Troubleshooting](#26-troubleshooting)
 
 ## 1. Infrastructure Setup
 
@@ -471,9 +477,11 @@ docker logs $(docker ps -q --filter name=swarmex_vault-sync) --tail 10
 # Error: "vault read failed" means OpenBao is unreachable or path doesn't exist
 ```
 
-## 9. Blue/Green Deployments
+## 9. Blue/Green and Canary Deployments
 
-### How the Deployer Works
+The deployer controller supports two strategies: **blue/green** (full parallel service swap) and **canary** (gradual traffic shifting with 1 replica). See [Section 20](#20-canary-deployments) for canary details.
+
+### How the Deployer Works (Blue/Green)
 
 The deployer controller manages zero-downtime deployments:
 
@@ -1193,7 +1201,266 @@ swarmex.example.com  A  44.203.57.80     (node 3)
 
 Cloudflare round-robins between healthy IPs. If a node goes down, Cloudflare removes it from rotation within ~30 seconds.
 
-## 20. Troubleshooting
+## 20. Canary Deployments
+
+### How It Works
+
+The deployer controller supports canary deployments alongside blue/green. Canary creates a parallel service with 1 replica and gradually shifts Traefik traffic weights from 0% to 100%, monitoring error rates at each step. If errors exceed the threshold, it rolls back automatically.
+
+### Configuration
+
+```yaml
+deploy:
+  labels:
+    swarmex.deployer.strategy: "canary"
+    swarmex.deployer.shift-interval: "60s"    # time between weight shifts (default 60s)
+    swarmex.deployer.shift-step: "5"          # percentage per step (default 5%)
+    swarmex.deployer.error-threshold: "5"     # rollback if error rate > 5%
+    swarmex.deployer.rollback-on-fail: "true"
+```
+
+### Triggering a Canary
+
+Call the deployer API with the new image:
+
+```bash
+# From inside the swarmex network
+curl -X POST "http://swarmex_deployer:8080/deploy?service=<service-id>&image=registry/app:v2"
+```
+
+### Traffic Flow
+
+```
+t=0s    blue=100%  canary=0%    (canary service created with 1 replica)
+t=60s   blue=95%   canary=5%    (first shift, error rate checked)
+t=120s  blue=90%   canary=10%
+...
+t=20m   blue=0%    canary=100%  (promote: blue updated with canary image, canary removed)
+```
+
+If error rate exceeds threshold at any step: all traffic returns to blue, canary removed.
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_deployer) --tail 20
+# "shifting traffic" with green_weight and error_rate at each step
+# "error threshold exceeded, rolling back" if errors detected
+# "deployment complete, cleaning up blue" on success
+```
+
+## 21. Service Affinity and Anti-Affinity
+
+### How It Works
+
+The affinity controller manages service placement using Docker constraints:
+
+- **Colocate**: forces a service onto the same node as a target service
+- **Avoid**: forces a service onto a different node than a target service
+- **Spread**: distributes replicas across nodes with different label values
+
+### Configuration
+
+```yaml
+deploy:
+  labels:
+    swarmex.affinity.colocate: "svc-cache"     # same node as svc-cache
+    swarmex.affinity.avoid: "svc-db"           # different node than svc-db
+    swarmex.affinity.spread: "zone"            # spread across node.labels.zone values
+```
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_affinity) --tail 10
+# "affinity colocate" with service, target, and node
+# "affinity avoid" with service, target, and node
+# "affinity spread" with service and label
+```
+
+## 22. Disruption Budgets
+
+### How It Works
+
+Disruption budgets protect services during remediation actions. Before draining a node or force-restarting a service, remediation checks if the action would violate the budget.
+
+### Configuration
+
+```yaml
+deploy:
+  labels:
+    swarmex.remediation.enabled: "true"
+    swarmex.remediation.failure-threshold: "3"
+    swarmex.disruption.min-available: "2"      # drain blocked if <2 replicas would survive
+    swarmex.disruption.max-unavailable: "1"    # force-restart blocked if >1 already unavailable
+```
+
+- `min-available`: checked before node drain — counts surviving replicas on other nodes
+- `max-unavailable`: checked before force-restart — compares current unavailable vs limit
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_remediation) --tail 20
+# "drain blocked by disruption budget" when min-available would be violated
+# "force-restart blocked by disruption budget" when max-unavailable exceeded
+```
+
+## 23. Namespace Resource Quotas
+
+### How It Works
+
+Admission enforces resource quotas per namespace. When a new service with `swarmex.namespace` is created, admission sums the memory limits and service count of all existing services in that namespace and denies the new service if it would exceed the quota.
+
+### Configuration
+
+In `configs/admission/rules.yaml`:
+
+```yaml
+rules:
+  - name: require-memory-limit
+    validate:
+      message: "Service must have a memory limit"
+      require_memory_limit: true
+  - name: require-team-label
+    validate:
+      message: "Service must have a team label"
+      require_labels:
+        - team
+  - name: add-managed-by
+    mutate:
+      add_labels:
+        managed-by: swarmex
+
+quotas:
+  production:
+    max_memory: "8G"
+    max_services: 20
+  staging:
+    max_memory: "4G"
+    max_services: 10
+```
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_admission) --tail 10
+# "quota exceeded: max_services" with namespace, count, max
+# "quota exceeded: max_memory" with namespace, total_mb, max_mb
+# "admission denied — namespace quota exceeded" with service name
+```
+
+## 24. Stateful Services
+
+### How It Works
+
+The stateful controller provides StatefulSet-like behavior. When a service with `swarmex.stateful.enabled=true` is created, the controller:
+
+1. Scales the original service to 0 (keeps it as a template)
+2. Creates N individual services (`svc-0`, `svc-1`, `svc-2`) each with 1 replica
+3. Each instance gets its own named volume from the template
+4. If `ordered=true`, waits for each instance to be healthy before creating the next
+
+### Configuration
+
+```yaml
+deploy:
+  labels:
+    swarmex.stateful.enabled: "true"
+    swarmex.stateful.replicas: "3"
+    swarmex.stateful.volume-template: "data-{index}"   # creates data-0, data-1, data-2
+    swarmex.stateful.ordered: "true"                    # sequential startup
+```
+
+### Limitations
+
+- Volumes are local to the node — use distributed storage (SeaweedFS/NFS) for node migration
+- No automatic rebalancing if a node dies
+- Deleting the template service does not delete the instances
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_stateful) --tail 10
+# "creating stateful set" with service name, replicas, ordered
+# "stateful instance created" with name and index for each instance
+```
+
+## 25. Swarmex Pack (Helm-like Packaging)
+
+### How It Works
+
+`swarmex-pack` is a CLI tool that renders Go templates into Docker Compose files and deploys them as stacks. It provides Helm-like packaging for Docker Swarm.
+
+### Pack File
+
+Create `swarmex-pack.yml`:
+
+```yaml
+name: my-app
+version: "1.0"
+values:
+  image: registry.example.com/my-app:latest
+  replicas: "2"
+  memory: 256M
+  team: my-team
+  domain: myapp.example.com
+template: stack.yml.tmpl
+```
+
+### Template
+
+Create `stack.yml.tmpl`:
+
+```yaml
+version: "3.8"
+services:
+  web:
+    image: {{.image}}
+    deploy:
+      replicas: {{.replicas}}
+      resources:
+        limits:
+          memory: {{.memory}}
+      labels:
+        team: {{.team}}
+        traefik.enable: "true"
+        traefik.http.routers.myapp.rule: "Host(`{{.domain}}`)"
+        traefik.http.routers.myapp.tls.certresolver: "le"
+        traefik.http.services.myapp.loadbalancer.server.port: "8080"
+    networks:
+      - traefik-public
+
+networks:
+  traefik-public:
+    external: true
+```
+
+### Commands
+
+```bash
+# Render template to stdout (preview)
+swarmex-pack render --set image=registry/app:v2
+
+# Install (deploy stack)
+swarmex-pack install my-app --set image=registry/app:v2 --set replicas=3
+
+# Upgrade (same as install — stack deploy is idempotent)
+swarmex-pack upgrade my-app --set image=registry/app:v3
+
+# Uninstall (remove stack)
+swarmex-pack uninstall my-app
+```
+
+### Running via Docker
+
+```bash
+docker run --rm -v $(pwd):/app -v /var/run/docker.sock:/var/run/docker.sock \
+  registry.labtau.com/ccvass/swarmex/swarmex-pack:latest \
+  install my-app --pack-file /app/swarmex-pack.yml
+```
+
+## 26. Troubleshooting
 
 ### Service Won't Start
 

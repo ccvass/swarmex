@@ -23,7 +23,7 @@ echo "║           SWARMEX INSTALLER v1.0                 ║"
 echo "║  Enterprise orchestration for Docker Swarm       ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
-echo "This script deploys 35 services (16 controllers + platform stack)"
+echo "This script deploys 37 services (18 controllers + platform stack)"
 echo "on your existing Docker Swarm cluster."
 echo ""
 
@@ -244,7 +244,7 @@ $SSH "
 cd /tmp/swarmex-coordinator
 docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
 " >/dev/null 2>&1
-info "Stack: swarmex (16 controllers)"
+info "Stack: swarmex (18 controllers)"
 
 # ─── Cluster scaler (optional) ───────────────────────────────────────
 if [ -n "$CS_PROVIDER" ]; then
