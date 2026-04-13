@@ -17,5 +17,3 @@ build-authentik:
       --destination "${CI_REGISTRY_IMAGE}/authentik-patched:2024.8.3"
   only:
     - main
-  changes:
-    - docker/authentik/**/*
