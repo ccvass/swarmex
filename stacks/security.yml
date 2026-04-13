@@ -4,12 +4,10 @@ services:
     image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
     command: server
     environment:
-    - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
     - AUTHENTIK_REDIS__HOST=authentik-valkey
     - AUTHENTIK_POSTGRESQL__HOST=authentik-db
     - AUTHENTIK_POSTGRESQL__USER=authentik
     - AUTHENTIK_POSTGRESQL__NAME=authentik
-    - AUTHENTIK_POSTGRESQL__PASSWORD__FILE=/run/secrets/authentik_db_pw
     secrets:
     - authentik_secret
     - authentik_db_pw
@@ -37,16 +35,19 @@ services:
     networks:
     - security
     - traefik-public
+    entrypoint:
+    - /bin/sh
+    - -c
+    - export AUTHENTIK_SECRET_KEY=$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$(cat
+      /run/secrets/authentik_db_pw) && exec /lifecycle/ak server
   authentik-worker:
     image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
     command: worker
     environment:
-    - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
     - AUTHENTIK_REDIS__HOST=authentik-valkey
     - AUTHENTIK_POSTGRESQL__HOST=authentik-db
     - AUTHENTIK_POSTGRESQL__USER=authentik
     - AUTHENTIK_POSTGRESQL__NAME=authentik
-    - AUTHENTIK_POSTGRESQL__PASSWORD__FILE=/run/secrets/authentik_db_pw
     secrets:
     - authentik_secret
     - authentik_db_pw
@@ -60,6 +61,11 @@ services:
           memory: 1G
     networks:
     - security
+    entrypoint:
+    - /bin/sh
+    - -c
+    - export AUTHENTIK_SECRET_KEY=$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$(cat
+      /run/secrets/authentik_db_pw) && exec /lifecycle/ak worker
   authentik-db:
     image: postgres:18-alpine
     environment:
