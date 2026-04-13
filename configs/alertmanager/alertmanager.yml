@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: webhook
+  group_by: [alertname, service]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 1h
+
+receivers:
+  - name: webhook
+    webhook_configs:
+      - url: http://swarmex_api:8080/api/v1/resources
+        send_resolved: true
