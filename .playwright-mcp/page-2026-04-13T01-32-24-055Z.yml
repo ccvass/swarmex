@@ -1,0 +1,13 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - list
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - img "authentik Logo" [ref=e13]
+      - generic [ref=e15]:
+        - progressbar [ref=e18]
+        - heading "Cargando" [level=1] [ref=e22]
+    - contentinfo [ref=e23]:
+      - list [ref=e24]:
+        - listitem [ref=e25]:
+          - generic [ref=e26]: Desarrollado por authentik

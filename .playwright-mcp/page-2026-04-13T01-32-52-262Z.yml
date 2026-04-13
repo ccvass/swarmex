@@ -1,0 +1,36 @@
+- generic [ref=e1]:
+  - generic:
+    - list
+  - generic [ref=e10]:
+    - generic [ref=e11]:
+      - generic [ref=e55]:
+        - progressbar [ref=e58]
+        - heading [level=1]
+      - img "authentik Logo" [ref=e13]
+      - generic [ref=e27]:
+        - banner [ref=e28]:
+          - heading "Welcome to authentik!" [level=1] [ref=e29]
+        - generic [ref=e31]:
+          - paragraph [ref=e32]: Welcome to authentik! Please set a password and email address for the default admin user, akadmin.
+          - generic [ref=e34]:
+            - generic [ref=e35]:
+              - generic [ref=e36]: Email
+              - text: "*"
+            - textbox "Admin email" [ref=e37]: admin@swarmex.apulab.info
+          - generic [ref=e39]:
+            - generic [ref=e40]:
+              - generic [ref=e41]: Password
+              - text: "*"
+            - textbox "Password" [ref=e42]: Sw4rm3x!Auth2026
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - generic [ref=e46]: Password (repeat)
+              - text: "*"
+            - textbox "Password (repeat)" [ref=e47]: Sw4rm3x!Auth2026
+          - button "Continuar" [ref=e49] [cursor=pointer]
+        - contentinfo [ref=e50]:
+          - list [ref=e51]
+    - contentinfo [ref=e23]:
+      - list [ref=e24]:
+        - listitem [ref=e25]:
+          - generic [ref=e26]: Desarrollado por authentik
