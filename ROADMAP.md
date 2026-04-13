@@ -63,7 +63,7 @@ All are built on the **Docker Event Stream** pattern using the Docker Engine SDK
 
 ### Architecture Pattern
 
-All custom services follow the same pattern from SWARMEX.md section 5:
+All custom services follow the same pattern using the Docker Event Stream pattern:
 
 ```
 Docker Socket (/var/run/docker.sock)

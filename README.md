@@ -131,6 +131,8 @@ Federation was tested with a temporary 3-node GCP cluster (e2-medium, us-central
 
 All tools are 100% open source. When dual-licensed (CE/EE), only the community edition is used.
 
+Traefik runs on the manager with Swarm routing mesh — traffic on ports 80/443 reaches Traefik from any node IP. If the manager fails, point DNS to another node. Cloudflare DNS challenge provides wildcard SSL certificates for multiple domains without exposing port 80.
+
 ```mermaid
 graph TB
     subgraph Ingress
