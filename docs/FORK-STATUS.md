@@ -1,83 +1,59 @@
 # Fork Status Report
 
-Status of each forked repository and what changes (if any) were made.
+Status of each forked repository and changes made.
 
-## Changes Made in Forks: NONE
+## Summary
 
-All 14 forked repositories contain upstream code without modifications.
-All fixes and adaptations were done in the **coordinator repo** (stacks, configs, Dockerfiles).
+- **31 repositories** in `ccvass/swarmex` GitLab group
+- **16 custom controllers** built from scratch in Go
+- **1 patched fork** (Authentik) with CI/CD pipeline
+- **4 active forks** used as-is (swarm-cronjob, gantry, swarm-cd, EasyTier)
+- **4 active forks** with improvements (SeaweedFS Swarm, SeaweedFS volume plugin, Portainer CE, Swarmpit)
+- **5 archived forks** (superseded)
+- **2 upstream PRs** submitted to GitHub
 
-This is a problem — the forks should contain our improvements, not the coordinator.
+## Custom Controllers (16)
 
-## What Should Be Done Per Fork
+All built in Go 1.26, ~8MB binaries, CI/CD via kaniko, images at `registry.labtau.com/ccvass/swarmex/`.
 
-### Active Forks (need work)
-
-| Fork | Upstream Code | What We Did in Coordinator | What Should Be in the Fork |
+| Controller | Pipeline | /metrics | Verified |
 |:---|:---|:---|:---|
-| `seaweedfs-swarm` | Generic 3-node compose | Created `configs/seaweedfs/master-entrypoint.sh` with `hostname -i` fix | Entrypoint scripts should be in this repo, not coordinator |
-| `seaweedfs-volume-plugin` | Generic volume driver | Nothing | Test compatibility with current SeaweedFS version |
-| `swarm-monitoring` | Prometheus+cAdvisor+Grafana stack | Created our own `stacks/observability.yml` from scratch | Merge our observability stack improvements back |
-| `portainer-ce` | Upstream CE | Pinned to 2.25.1 in stack | No changes needed in fork |
-| `easytier` | Upstream mesh VPN | Nothing | nano-mesh wrapper needs EasyTier as dependency, not fork changes |
-| `swarm-cronjob` | Production-ready | Nothing | No changes needed — use as-is |
-| `gantry` | Production-ready | Nothing | No changes needed — use as-is |
-| `swarm-cd` | Production-ready | Created `configs/swarmcd/repos.yaml` + `stacks.yaml` | Config templates could live in fork |
-| `swarm-autoscaler` | Ruby, obsolete | Nothing | Superseded by swarmex-scaler (Go). Archive this fork |
+| event-controller | ✅ | ✅ | ✅ Real-time event capture |
+| scaler | ✅ | ✅ | ✅ 2→5→2 replicas |
+| gatekeeper | ✅ | ✅ | ✅ Traefik label toggle |
+| remediation | ✅ | ✅ | ✅ Drained node + safety check |
+| deployer | ✅ | ✅ | ✅ Green service created |
+| vault-sync | ✅ | ✅ | ✅ 2 secrets synced |
+| operator-db | ✅ | ✅ | ✅ PostgreSQL failover |
+| nano-mesh | ✅ | ✅ | ✅ Peer registration |
+| namespaces | ✅ | ✅ | ✅ Overlay networks created |
+| netpolicy | ✅ | ✅ | ✅ Cross-namespace access |
+| rbac | ✅ | ✅ | ✅ JWT + role-based access |
+| admission | ✅ | ✅ | ✅ Validate + mutate + stack deploy |
+| vpa | ✅ | ✅ | ✅ 512M→32M adjustment |
+| traffic | ✅ | ✅ | ✅ retry + rate-limit |
+| federation | ✅ | ✅ | ✅ AWS→GCP cross-cloud |
+| api | ✅ | ✅ | ✅ CRUD + bbolt persistence |
 
-### Authentik (special case)
+## Patched Fork
 
-| Fork | What Happened |
-|:---|:---|
-| `authentik` | NOT FORKED to GitLab. We patched `config.py` directly on the AWS cluster via a custom Dockerfile in the coordinator (`docker/authentik/Dockerfile`). The patch adds `__setitem__`, `__getitem__`, `get()` methods to the `Attr` dataclass to fix Python 3.12+ compatibility. This patch MUST be moved to the fork repo. |
-
-### Inactive Forks (discard candidates)
-
-| Fork | Status | Action |
-|:---|:---|:---|
-| `coolify` | Discarded — no Swarm support | Archive |
-| `promswarm` | Discarded — stale, replaced by swarm-monitoring | Archive |
-| `swarm-sync` | Discarded — superseded by swarm-cd | Archive |
-| `hca` | Discarded — abandoned, superseded by swarmex-scaler | Archive |
-| `swarmpit` | Optional — not needed with Portainer CE | Keep but don't invest |
-
-## Priority Actions
-
-1. ~~**Fork Authentik properly**~~ ✅ Done — `ccvass/swarmex/authentik` with patches + CI/CD
-2. ~~**Move SeaweedFS entrypoint scripts**~~ ✅ Done — pushed to `ccvass/swarmex/seaweedfs-swarm`
-3. ~~**Archive inactive forks**~~ ✅ Done — coolify, promswarm, swarm-sync, hca, swarm-autoscaler marked archived
-4. ~~**Add CI/CD**~~ ✅ Done — `.gitlab-ci.yml` added to all 8 swarmex controller repos + authentik fork
+| Fork | Change | CI/CD | Image |
+|:---|:---|:---|:---|
+| Authentik 2024.8.3 | `config.py` + `dict.py` — Attr dataclass path navigation fix | ✅ | `registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest` |
 
 ## Upstream PRs
 
-| PR | Repo | Status | URL |
+| PR | Repository | Description | Status |
 |:---|:---|:---|:---|
-| Attr path navigation fix | goauthentik/authentik | Open | https://github.com/goauthentik/authentik/pull/21557 |
-| Swarm overlay IP entrypoints | cycneuramus/seaweedfs-docker-swarm | Open | https://github.com/cycneuramus/seaweedfs-docker-swarm/pull/3 |
+| [#21557](https://github.com/goauthentik/authentik/pull/21557) | goauthentik/authentik | Fix Attr path navigation for Docker Swarm env vars | Open |
+| [#3](https://github.com/cycneuramus/seaweedfs-docker-swarm/pull/3) | cycneuramus/seaweedfs-docker-swarm | Swarm overlay IP resolution in entrypoint scripts | Open |
 
-## Governance Controllers (Phase 2)
+## Bugs Found and Fixed
 
-Built and verified 2026-04-12:
-
-| Controller | Repo | Pipeline | Verified |
-|:---|:---|:---|:---|
-| namespaces | `ccvass/swarmex/swarmex-namespaces` | ✅ success | ✅ Creates overlay networks per namespace |
-| netpolicy | `ccvass/swarmex/swarmex-netpolicy` | ✅ success | ✅ Cross-namespace network access |
-| rbac | `ccvass/swarmex/swarmex-rbac` | ✅ success | ✅ Docker socket proxy with role-based access |
-| admission | `ccvass/swarmex/swarmex-admission` | ✅ success | ✅ Running, configurable validation rules |
-
-## Advanced Controllers (Phase 3)
-
-Built and verified 2026-04-12:
-
-| Controller | Repo | Pipeline | Verified |
-|:---|:---|:---|:---|
-| vpa | `ccvass/swarmex/swarmex-vpa` | ✅ success | ✅ Watching services, Prometheus queries |
-| traffic | `ccvass/swarmex/swarmex-traffic` | ✅ success | ✅ Applied retry + rate-limit to test-app |
-| federation | `ccvass/swarmex/swarmex-federation` | ✅ success | ✅ Running (needs remote cluster) |
-| api | `ccvass/swarmex/swarmex-api` | ✅ success | ✅ CRUD: POST created resource, GET listed |
-
-## Bug Found During Testing
-
-Remediation controller drained the only manager node (#45), causing 28 services to go Pending.
-Fix: safety check — never drain the last active manager. Pushed and deployed.
+| Issue | Problem | Fix |
+|:---|:---|:---|
+| #45 | Remediation drained the only manager node | Safety check: never drain last active manager |
+| #59 | AlertManager webhook format mismatch | Added `/api/v1/alerts` endpoint to swarmex-api |
+| #61 | Remediation left with DEBUG log level | Default INFO, configurable via `LOG_LEVEL` env var |
+| #63 | Grafana lost datasources on restart | Provisioning via config file + persistent volume |
+| #64 | Authentik image only on manager | Pushed to registry, services use registry image |
