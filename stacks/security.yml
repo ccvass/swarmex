@@ -117,7 +117,7 @@ services:
         traefik.http.routers.openbao.tls.certresolver: "le"
         traefik.http.services.openbao.loadbalancer.server.port: "8200"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true"]
       interval: 15s
       timeout: 5s
       retries: 3

@@ -93,7 +93,7 @@ services:
       - monitoring
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.6.1  # 2.7+ requires Kafka, see docs/FORK-STATUS.md
     configs:
       - source: tempo_config
         target: /etc/tempo.yaml
