@@ -230,6 +230,26 @@ pie title Services by Category
 | Services running | — | 38 on 3× t3.large (8 GB each) |
 | Total controller binaries | — | 16 × ~8 MB = 128 MB |
 
+## Test Environment
+
+All features were tested on a live AWS cluster, not in simulation:
+
+| | Detail |
+|:---|:---|
+| Cloud | AWS us-east-1 |
+| Nodes | 3× t3.large (2 vCPU, 8 GB RAM, Ubuntu 24.04) |
+| Docker | 29.4.0 with Swarm mode |
+| DNS | `*.swarmex.apulab.info` via Cloudflare |
+| SSL | Let's Encrypt wildcard (Cloudflare DNS challenge) |
+| Registry | Self-hosted GitLab at `registry.labtau.com` |
+| CI/CD | GitLab CI with kaniko (17 pipelines) |
+| Services | 39 running simultaneously on 3 nodes |
+| Uptime | Cluster survived remediation drain, controller restarts, and stress tests |
+
+Cross-cloud federation was tested with a temporary 3-node GCP cluster (e2-medium, us-central1-a) — created, tested, and deleted in the same session.
+
+Cluster autoscaling was tested by generating CPU load (12 stress containers) — the cluster-scaler provisioned 2 additional EC2 instances (t3.medium), which joined the Swarm automatically. After removing the load, both instances were drained and terminated, returning to the original 3 nodes.
+
 ## Quick Start
 
 ```bash
