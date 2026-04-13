@@ -222,10 +222,41 @@ pie title Services by Category
 |:---|:---|:---|
 | Control plane RAM | 1.5–2 GB | ~100 MB (embedded in Docker) |
 | Control plane components | 5 (etcd, apiserver, scheduler, controller-manager, coredns) | 0 |
-| Setup time | 30–60 min | 2 min (`docker swarm init`) |
+| Total platform RAM | 4–6 GB (control plane + monitoring) | 1.8 GB (35 services + monitoring) |
+| 16 controllers total | — | ~100 MB (6 MB each) |
+| Idle cluster CPU | 15–25% | ~19% |
+| Setup time | 30–60 min | ~5 min |
 | Config per service | 3–5 YAML files | 1 Compose file + labels |
-| Managed service cost | $70–150/month | $0 |
+| Managed service cost | $70–150/month (EKS/GKE/AKS) | $0 |
 | Total controller binaries | — | 16 × ~8 MB = 128 MB |
+
+Measured on 3× t3.large (2 vCPU, 8 GB RAM each) with 35 services and 41 containers running:
+
+| Node | Containers | CPU | RAM |
+|:---|:---|:---|:---|
+| Manager | 28 | 9.7% | 440 MiB |
+| Worker 1 | 7 | 6.1% | 792 MiB |
+| Worker 2 | 6 | 3.2% | 550 MiB |
+| **Total** | **41** | **~19%** | **~1.8 GiB / 24 GiB** |
+
+## When to Use Kubernetes Instead
+
+Swarmex closes most feature gaps with Kubernetes, but K8s has real advantages in specific scenarios. Be honest about the trade-offs:
+
+| Area | Kubernetes Advantage | Swarmex Approach |
+|:---|:---|:---|
+| **Ecosystem** | Thousands of Helm charts, operators, CRDs ready to use | 16 custom controllers — covers core needs but no third-party ecosystem |
+| **Advanced scheduling** | Affinity/anti-affinity, taints/tolerations, topology spread, pod disruption budgets | Basic placement constraints only |
+| **Stateful workloads** | StatefulSets with stable identity, dynamic PV provisioning | No native equivalent — use named volumes + placement constraints |
+| **Multi-tenancy** | Namespaces with ResourceQuotas, LimitRanges, kernel-level NetworkPolicies | Simulated via controllers — not kernel-level enforcement |
+| **Service mesh** | Istio, Linkerd, Cilium (eBPF) — production-proven at scale | nano-mesh (EasyTier/WireGuard) — simpler but less mature |
+| **Enterprise adoption** | Managed services (EKS, GKE, AKS), certifications, commercial support, large talent pool | Docker Swarm is in maintenance mode — smaller community |
+| **Canary deployments** | Native canary with exact traffic percentages, rollback by metrics | Blue/green only — no weighted canary |
+| **API extensibility** | CRDs with validation webhooks, custom controllers, full API machinery | Labels-based — simpler but less powerful |
+
+**Choose Kubernetes when:** you need a large ecosystem of third-party operators, advanced scheduling for complex stateful workloads, kernel-level network isolation, or your organization already has K8s expertise and managed service budgets.
+
+**Choose Swarmex when:** you want enterprise features without the complexity and resource overhead, your team knows Docker Compose, you run on constrained infrastructure, or you need a platform that deploys in 5 minutes with 1.8 GB of RAM.
 
 ## Test Environment
 
