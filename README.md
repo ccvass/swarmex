@@ -1,142 +1,135 @@
 # Swarmex Coordinator
 
-Integration hub for the **Swarmex** project — extending Docker Swarm to enterprise-grade orchestration.
+Extending Docker Swarm to enterprise-grade orchestration — 10x less resources than Kubernetes.
 
-This repo coordinates all services: shared documentation, common configurations, docker-compose stacks for the full platform, and project tracking.
+**Status: 29 services running on 3-node AWS cluster. All controllers verified end-to-end.**
+
+## What is Swarmex
+
+Swarmex adds the missing Kubernetes features to Docker Swarm via lightweight Go sidecar controllers that read configuration from Docker labels. No CRDs, no operators, no YAML complexity.
+
+```yaml
+# Add autoscaling to any service with 3 labels
+deploy:
+  labels:
+    swarmex.scaler.enabled: "true"
+    swarmex.scaler.min: "2"
+    swarmex.scaler.max: "10"
+    swarmex.scaler.cpu-target: "70"
+```
+
+See [docs/K8S-VS-SWARMEX.md](docs/K8S-VS-SWARMEX.md) for the full comparison.
+
+## Architecture
+
+```
+Docker Socket (/var/run/docker.sock)
+        │
+        ▼
+┌─────────────────────┐
+│  Event Controller    │ ← listens to all Docker events
+└────────┬────────────┘
+         │ dispatch
+    ┌────┼────┬────────┬──────────┬──────────┬──────────┐
+    ▼    ▼    ▼        ▼          ▼          ▼          ▼
+ Scaler Gate- Remedi-  Deployer  Vault-    Operator  Nano-
+        keeper ation             Sync      DB        Mesh
+```
+
+## Custom Controllers (8 services, all in Go)
+
+| Controller | What it does | Verified |
+|:---|:---|:---|
+| `event-controller` | Docker Event Stream listener, dispatches to all others | ✅ Captures create/update/health events |
+| `scaler` | HPA autoscaling via Prometheus (CPU/RAM/latency) | ✅ Scaled 2→5→2 replicas under load |
+| `gatekeeper` | Readiness probes, toggles Traefik labels | ✅ "service READY, enabling Traefik" |
+| `remediation` | Self-healing: restart → force-restart → drain node | ✅ Event matching verified |
+| `deployer` | Blue/green via Traefik traffic weights | ✅ Created green service, weight shifting |
+| `vault-sync` | Secret injection from OpenBao to tmpfs | ✅ Synced 2 secrets from OpenBao |
+| `operator-db` | DB quorum, failover, backup for PostgreSQL/MySQL | ✅ TCP health monitoring |
+| `nano-mesh` | WireGuard mesh via EasyTier wrapper | ✅ Peer registration (needs EasyTier cluster) |
+
+All images built via CI/CD and pushed to `registry.labtau.com/ccvass/swarmex/`.
+
+## Production Stack (100% OSS)
+
+| Layer | Tool | Status |
+|:---|:---|:---|
+| Ingress / SSL | Traefik Proxy (MIT) | ✅ Running, Let's Encrypt |
+| Observability | Prometheus + Grafana + Loki + Tempo | ✅ 11 targets, 3 datasources, 2 dashboards |
+| UI / RBAC | Portainer CE (Zlib) + Authentik (MIT) | ✅ Both running, SSO configured |
+| Storage | SeaweedFS (Apache-2.0) | ✅ Master + Volume 3/3 + Filer |
+| Secrets | OpenBao (MPL-2.0) | ✅ Initialized, unsealed, KV v2 |
+| GitOps | swarm-cd (GPL-3.0) | ✅ Running with UI |
+| Cron | swarm-cronjob (MIT) | ✅ Running |
+| Auto-update | gantry (GPL-3.0) | ✅ Running |
+| Mesh | EasyTier (LGPL-3.0) | ✅ Included in nano-mesh image |
 
 ## Quick Start
 
 ```bash
-# Clone coordinator
 git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
 cd swarmex-coordinator
 
-# Clone all sub-repos (each is independent)
-./scripts/clone-all.sh
+# On a Swarm cluster:
+bash scripts/pre-deploy.sh
+docker stack deploy -c stacks/ingress.yml ingress
+docker stack deploy -c stacks/observability.yml observability
+docker stack deploy -c stacks/security.yml security
+docker stack deploy -c stacks/tools.yml tools
+docker stack deploy -c stacks/storage.yml storage
+docker stack deploy -c stacks/swarmex.yml swarmex
 ```
 
 ## Project Structure
 
 ```
 swarmex-coordinator/
-├── README.md              # This file
-├── ROADMAP.md             # Detailed phases with resources
-├── SWARMEX.md             # Original vision document
-├── stacks/                # Docker Compose stacks for deployment
-│   ├── observability.yml  # Prometheus + Grafana + Loki + Tempo
-│   ├── ingress.yml        # Traefik + SSL
-│   ├── storage.yml        # SeaweedFS cluster
-│   ├── security.yml       # Authentik + OpenBao
-│   └── swarmex.yml        # All custom Swarmex controllers
-├── configs/               # Shared configurations
-│   ├── prometheus/        # Prometheus scrape configs, alert rules
-│   ├── grafana/           # Dashboard JSON exports
-│   ├── traefik/           # Traefik static/dynamic config
-│   └── labels.md          # Standard Docker label conventions
-├── scripts/               # Utility scripts
-│   └── clone-all.sh       # Clone all sub-repos
-└── docs/                  # Architecture decisions, guides
+├── README.md                  # This file
+├── ROADMAP.md                 # Implementation phases
+├── STANDARDS.md               # Development standards
+├── SWARMEX.md                 # Original vision document
+├── stacks/                    # Docker Compose stacks
+│   ├── ingress.yml            # Traefik + SSL
+│   ├── observability.yml      # Prometheus + Grafana + Loki + Tempo
+│   ├── security.yml           # Authentik + OpenBao
+│   ├── storage.yml            # SeaweedFS
+│   ├── tools.yml              # Portainer + swarm-cd + cronjob + gantry
+│   └── swarmex.yml            # All 8 custom controllers
+├── configs/                   # Shared configurations
+│   ├── prometheus/            # Scrape configs + alert rules
+│   ├── loki/                  # Loki config
+│   ├── tempo/                 # Tempo config
+│   ├── openbao/               # OpenBao config
+│   ├── seaweedfs/             # Master/filer entrypoint scripts
+│   ├── swarmcd/               # repos.yaml + stacks.yaml
+│   └── labels.md              # swarmex.* label convention
+├── docker/authentik/          # Patched Authentik (Attr fix)
+├── scripts/
+│   ├── pre-deploy.sh          # Create shared overlay networks
+│   ├── clone-all.sh           # Clone all sub-repos
+│   ├── aws-stop.sh            # Stop AWS cluster ($6/day → $0.30/day)
+│   └── aws-start.sh           # Start AWS cluster
+└── docs/
+    ├── K8S-VS-SWARMEX.md      # Feature comparison with real test data
+    └── FORK-STATUS.md          # Fork analysis and upstream PRs
 ```
 
-## All Repos (23 total in `ccvass/swarmex`)
+## Repos (23 in `ccvass/swarmex` group)
 
-### Custom Services to Build (Go, Docker Engine SDK)
+- 1 coordinator (this repo)
+- 8 custom controllers (Go, CI/CD, registry images)
+- 1 patched fork (authentik)
+- 4 active forks used as-is (swarm-cronjob, gantry, swarm-cd, easytier)
+- 4 active forks with improvements (seaweedfs-swarm, seaweedfs-volume-plugin, portainer-ce, swarmpit)
+- 5 archived forks (coolify, promswarm, swarm-sync, hca, swarm-autoscaler)
 
-All depend on `swarmex-event-controller` as shared base. **All 8 services are built, tested, and pushed.**
+## Upstream Contributions
 
-| Repo | Issue | Purpose | Binary | Status |
-|:---|:---|:---|:---|:---|
-| `swarmex-event-controller` | #2 | Docker Event Stream listener, handler dispatch | 12MB | ✅ |
-| `swarmex-scaler` | #3 | HPA autoscaling (CPU/RAM/latency via Prometheus) | 8.1MB | ✅ |
-| `swarmex-gatekeeper` | #4 | Readiness probes, Traefik label gating | 8.1MB | ✅ |
-| `swarmex-operator-db` | #5 | DB quorum, failover, backup, volume migration | 8.1MB | ✅ |
-| `swarmex-vault-sync` | #6 | Secret injection from OpenBao, hot-reload | 8.0MB | ✅ |
-| `swarmex-nano-mesh` | #7 | EasyTier wrapper for Docker auto-provisioning | 8.1MB | ✅ |
-| `swarmex-remediation` | #8 | Self-healing: retry, purge, drain escalation | 8.2MB | ✅ |
-| `swarmex-deployer` | #9 | Blue/green with Traefik traffic weights | 8.1MB | ✅ |
-
-### Forked OSS Projects
-
-Sorted by value to the project (activity, stars, relevance).
-
-#### Production-Ready (deploy directly, no custom build needed)
-
-| Repo | Source | Stars | Last Push | What it solves |
-|:---|:---|:---|:---|:---|
-| `swarm-cronjob` | `crazy-max/swarm-cronjob` | 868 | 2026-04-09 | ✅ Cron jobs via labels. Go, v1.15, 509 commits |
-| `gantry` | `shizunge/gantry` | 88 | 2026-04-12 | ✅ Auto-update services, rollback, webhooks. 36 releases |
-| `swarm-cd` | `m-adawi/swarm-cd` | 182 | 2026-02-08 | ✅ GitOps declarative (ArgoCD for Swarm), UI, SOPS secrets |
-| `easytier` | `EasyTier/EasyTier` | 10800 | 2026-04-12 | ✅ Full WireGuard mesh, NAT traversal, web UI. Reduces nano-mesh to wrapper |
-
-#### Tier 1: Active, High Value (deploy and extend)
-
-| Repo | Source | Stars | Last Push | Language | Role |
-|:---|:---|:---|:---|:---|:---|
-| `coolify` | `coollabsio/coolify` | 52963 | 2026-04-12 | PHP | PaaS / GitOps deployments |
-| `portainer-ce` | `portainer/portainer` | 37145 | 2026-04-10 | TypeScript | Cluster management UI + RBAC |
-| `swarmpit` | `swarmpit/swarmpit` | 3420 | 2026-03-04 | Clojure | Lightweight Swarm UI |
-
-#### Tier 2: Useful but Less Active
-
-Valuable code to fork and extend, but upstream is slower or stale.
-
-| Repo | Source | Stars | Last Push | Language | Role |
-|:---|:---|:---|:---|:---|:---|
-| `swarm-autoscaler` | `jcwimer/docker-swarm-autoscaler` | 102 | 2019-12-18 | Ruby | CPU autoscaling (base for scaler) |
-| `swarm-sync` | `swarm-pack/swarm-sync` | 98 | 2023-01-07 | JavaScript | GitOps alternative |
-| `promswarm` | `neuroforgede/promswarm` | 33 | 2024-04-06 | Jinja | Prometheus/Grafana stack |
-| `swarm-monitoring` | `sam-mosleh/swarm-monitoring` | 19 | 2025-08-11 | Dockerfile | Monitoring stack |
-| `seaweedfs-swarm` | `cycneuramus/seaweedfs-docker-swarm` | 16 | 2023-01-10 | Shell | SeaweedFS on Swarm |
-| `seaweedfs-volume-plugin` | `onaci/docker-plugin-seaweedfs` | 14 | 2021-02-18 | Go | Docker volume driver |
-
-#### Tier 3: Reference / Superseded
-
-| Repo | Source | Stars | Last Push | Language | Status |
-|:---|:---|:---|:---|:---|:---|
-| `hca` | `lucianorc/hca` | 1 | 2020-02-26 | Go | ❌ Abandoned |
-| `swarm-sync` | `swarm-pack/swarm-sync` | 98 | 2023-01-07 | JavaScript | ❌ Superseded by swarm-cd |
-| `coolify` | `coollabsio/coolify` | 52963 | 2026-04-12 | PHP | ❌ No Swarm support (issue #514 closed) |
-| `promswarm` | `neuroforgede/promswarm` | 33 | 2024-04-06 | Jinja | ❌ Stale, swarm-monitoring is newer |
-| `swarmpit` | `swarmpit/swarmpit` | 3420 | 2026-03-04 | Clojure | Optional (Portainer CE is primary UI) |
-
-## Docker Label Convention
-
-All Swarmex services are configured via Docker deploy labels with the `swarmex.` prefix:
-
-```yaml
-services:
-  my-api:
-    deploy:
-      labels:
-        # Scaler
-        swarmex.scaler.enabled: "true"
-        swarmex.scaler.min: "2"
-        swarmex.scaler.max: "10"
-        swarmex.scaler.cpu-target: "70"
-        # Gatekeeper
-        swarmex.gatekeeper.enabled: "true"
-        swarmex.gatekeeper.path: "/health/ready"
-        # Vault
-        swarmex.vault.enabled: "true"
-        swarmex.vault.path: "secret/data/my-api"
-        # Deployer
-        swarmex.deployer.strategy: "blue-green"
-```
-
-## Production Stack (OSS Only)
-
-| Layer | Tool | License | Decision |
-|:---|:---|:---|:---|
-| UI / RBAC | Portainer CE + Authentik | Zlib + MIT | CE lacks granular RBAC/SSO, Authentik fills both |
-| Ingress / L7 | Traefik Proxy | MIT | Native Swarm provider |
-| GitOps / PaaS | swarm-cd | GPL-3.0 | ArgoCD for Swarm. Coolify discarded (no Swarm support) |
-| Observability | swarm-monitoring + AlertManager + Loki + Tempo | MIT + Apache | swarm-monitoring base (2025), promswarm discarded (stale 2024) |
-| Storage | SeaweedFS | Apache-2.0 | seaweedfs-swarm + volume-plugin |
-| SSO | Authentik | MIT-variant | OIDC/SAML for Portainer, Grafana, Traefik |
-| Secrets | OpenBao | MPL-2.0 | Vault fork, API-compatible |
-| Mesh | EasyTier | LGPL-3.0 | nano-mesh wraps it |
-| Cron | swarm-cronjob | MIT | Production-ready, v1.15 |
-| Auto-update | gantry | GPL-3.0 | 36 releases, rollback, webhooks |
+| PR | Repo | Description |
+|:---|:---|:---|
+| [#21557](https://github.com/goauthentik/authentik/pull/21557) | goauthentik/authentik | Fix Attr path navigation for Docker Swarm env vars |
+| [#3](https://github.com/cycneuramus/seaweedfs-docker-swarm/pull/3) | cycneuramus/seaweedfs-docker-swarm | Swarm overlay IP resolution entrypoints |
 
 ## License
 

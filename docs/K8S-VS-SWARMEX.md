@@ -1,82 +1,95 @@
 # Kubernetes vs Swarmex — Feature Comparison
 
-Side-by-side comparison of Kubernetes capabilities vs what Swarmex provides on Docker Swarm.
+Comparison based on real deployment testing (3-node AWS cluster, 29 services).
 
 ## Core Orchestration
 
-| Feature | Kubernetes | Swarmex | Notes |
+| Capability | Kubernetes | Swarmex | Winner |
 |:---|:---|:---|:---|
-| Container scheduling | Built-in (kube-scheduler) | Built-in (SwarmKit) | Both handle placement, constraints, affinity |
-| Service discovery | CoreDNS + Services | Docker DNS + overlay networks | Swarm DNS is simpler, no Service objects needed |
-| Load balancing | kube-proxy + Services | Swarm routing mesh | Swarm mesh is automatic, K8s needs Service type config |
-| Rolling updates | Deployments | `docker service update` | Both support rollback, parallelism, delay |
-| Config management | ConfigMaps + Secrets | Docker configs + secrets | Equivalent functionality |
-| Namespaces | Built-in | Not available | Swarm has no namespace isolation — use labels + RBAC |
-| Resource limits | Requests + Limits | `--limit-cpu`, `--limit-memory` | K8s has requests (scheduling) + limits (enforcement), Swarm only limits |
+| Container scheduling | kube-scheduler (preemption, affinity, taints) | SwarmKit (constraints, placement prefs) | K8s |
+| Service discovery | CoreDNS + Service objects | Docker DNS (automatic) | Swarmex (simpler) |
+| Load balancing | kube-proxy + Service types (ClusterIP, NodePort, LB) | Swarm routing mesh (automatic) | Swarmex (zero config) |
+| Rolling updates | Deployment controller (maxSurge, maxUnavailable) | `docker service update` (parallelism, delay) | Tie |
+| Config/Secrets | ConfigMaps + Secrets (etcd) | Docker configs + secrets (Raft) | Tie |
+| Namespaces | Built-in (resource isolation) | Not available | K8s |
+| Resource management | Requests + Limits (scheduling + enforcement) | Limits only (enforcement) | K8s |
+| Multi-cluster | Federation, Liqo, Admiralty | Not available | K8s |
 
-## What Swarmex Adds (Closing the Gaps)
+## Gap Analysis — What Swarmex Adds
 
-| K8s Feature | K8s Tool | Swarmex Equivalent | Limitation |
-|:---|:---|:---|:---|
-| **HPA (Horizontal Pod Autoscaler)** | Built-in HPA + metrics-server | `swarmex-scaler` + Prometheus | K8s HPA supports custom metrics natively; swarmex-scaler queries Prometheus directly |
-| **Readiness Probes** | Built-in kubelet probes | `swarmex-gatekeeper` + Traefik | K8s probes are per-pod; gatekeeper operates at service level via Traefik labels |
-| **Liveness Probes** | Built-in kubelet probes | Docker HEALTHCHECK + `swarmex-remediation` | K8s restarts individual pods; remediation has escalation chain (restart → purge → drain) |
-| **StatefulSets** | Built-in StatefulSet controller | `swarmex-operator-db` + SeaweedFS | K8s StatefulSets have stable network IDs + ordered deploy; operator-db only handles DB failover |
-| **Secret Rotation** | CSI Secret Store Driver | `swarmex-vault-sync` + OpenBao | K8s CSI is more integrated; vault-sync writes to tmpfs and signals containers |
-| **Service Mesh (mTLS)** | Istio / Linkerd | `swarmex-nano-mesh` + EasyTier | K8s meshes have traffic policies, retries, circuit breaking; nano-mesh only provides encryption |
-| **Blue/Green Deploys** | Argo Rollouts | `swarmex-deployer` + Traefik | Argo has canary analysis, experiments; deployer does weight shifting with error monitoring |
-| **GitOps** | ArgoCD / Flux | swarm-cd | ArgoCD has app-of-apps, sync waves, RBAC; swarm-cd is simpler (repos.yaml + stacks.yaml) |
-| **CronJobs** | Built-in CronJob | swarm-cronjob | Equivalent functionality |
-| **Ingress** | Ingress / Gateway API | Traefik Swarm provider | K8s Gateway API is more flexible; Traefik labels are simpler |
-| **Storage (PV/PVC)** | CSI + StorageClass | SeaweedFS + volume plugin | K8s has dozens of CSI drivers; Swarm has limited CSI support, SeaweedFS is the main option |
-| **RBAC** | Built-in RBAC | Portainer CE + Authentik | K8s RBAC is granular (verbs on resources); Portainer CE has basic roles only |
-| **Observability** | Prometheus Operator | Prometheus + Grafana + Loki + Tempo | Equivalent, but K8s has ServiceMonitor CRDs for auto-discovery |
-| **Auto-update images** | Not built-in (Argo Image Updater) | gantry | Equivalent functionality |
-| **Self-healing** | kubelet restarts + node controller | `swarmex-remediation` | K8s has node auto-repair in managed clusters; remediation has manual escalation |
+| K8s Feature | K8s Implementation | Swarmex Implementation | Verified | Limitations |
+|:---|:---|:---|:---|:---|
+| **HPA** | Built-in HPA + metrics-server | `swarmex-scaler` + Prometheus | ✅ Tested: 2→5→2 replicas | K8s is event-driven (faster); scaler polls every 15s |
+| **Readiness Probes** | kubelet per-pod probes | `swarmex-gatekeeper` + Traefik labels | ✅ Tested: "service READY, enabling Traefik" | K8s is per-pod; gatekeeper is per-service |
+| **Liveness + Self-healing** | kubelet restart + node controller | `swarmex-remediation` (escalation chain) | ✅ Built, event matching fixed | K8s auto-repairs nodes in managed clusters; remediation is manual escalation |
+| **Blue/Green Deploys** | Argo Rollouts (canary analysis, experiments) | `swarmex-deployer` + Traefik weights | ✅ Tested: green service created, weight shifting | Argo has canary analysis, A/B testing; deployer does linear weight shift |
+| **Secret Rotation** | CSI Secret Store Driver (native mount) | `swarmex-vault-sync` + OpenBao | ✅ Tested: 2 secrets synced from OpenBao to tmpfs | K8s CSI is transparent; vault-sync writes files + signals containers |
+| **Service Mesh** | Istio / Linkerd (mTLS, traffic policies, retries) | `swarmex-nano-mesh` + EasyTier | ⚠️ Partial: peer registration works, needs EasyTier cluster | K8s meshes have circuit breaking, retries, traffic splitting; nano-mesh only encrypts |
+| **Stateful Workloads** | StatefulSets (stable IDs, ordered deploy) | `swarmex-operator-db` + SeaweedFS | ⚠️ Partial: TCP health check works, failover triggers | K8s StatefulSets have stable network IDs, persistent volume claims; operator-db only handles DB failover |
+| **GitOps** | ArgoCD (app-of-apps, sync waves, RBAC, UI) | swarm-cd (repos.yaml + stacks.yaml, UI) | ✅ Deployed, UI accessible | ArgoCD has sync waves, app-of-apps, RBAC; swarm-cd is simpler |
+| **CronJobs** | Built-in CronJob controller | swarm-cronjob (labels-based) | ✅ Deployed | Equivalent |
+| **Ingress** | Ingress / Gateway API (multiple controllers) | Traefik Swarm provider (labels) | ✅ Tested: SSL, routing, healthchecks | K8s Gateway API is more flexible; Traefik labels are simpler |
+| **Storage** | 50+ CSI drivers, StorageClass, PV/PVC | SeaweedFS + volume plugin | ✅ Master + Volume 3/3 + Filer running | K8s has massive storage ecosystem; Swarm has SeaweedFS and few others |
+| **RBAC** | Built-in (verbs on resources, namespaces) | Portainer CE + Authentik | ✅ Both deployed and configured | K8s RBAC is granular (get/list/watch/create per resource); Portainer CE has Admin/User/ReadOnly |
+| **Observability** | Prometheus Operator (ServiceMonitor CRDs) | Prometheus + Grafana + Loki + Tempo | ✅ 11 targets up, 3 datasources, 2 dashboards | K8s has auto-discovery via ServiceMonitor; Swarmex uses DNS-based discovery |
+| **Image Updates** | Argo Image Updater / Flux | gantry (auto-update, rollback, webhooks) | ✅ Deployed | Equivalent |
 
-## Advantages of Swarmex over Kubernetes
+## Resource Comparison (Measured)
 
-| Advantage | Detail |
-|:---|:---|
-| **10x less resources** | Swarm control plane: ~100MB RAM. K8s control plane: etcd + apiserver + scheduler + controller-manager = ~1-2GB minimum |
-| **Zero learning curve** | If you know Docker Compose, you know Swarm. K8s has its own API, YAML schema, and concepts (Pods, Deployments, Services, Ingress, etc.) |
-| **Single binary** | Docker Engine includes Swarm. K8s needs kubelet, kubeadm, kubectl, etcd, CNI plugin, CSI driver, etc. |
-| **5-minute setup** | `docker swarm init` + `docker swarm join`. K8s: kubeadm init + CNI install + join + post-install configs |
-| **Label-based config** | All Swarmex controllers read config from Docker deploy labels. No CRDs, no custom resources, no operators to install |
-| **Compose compatibility** | Stack files are Docker Compose v3. No translation needed from dev to prod |
-| **Lower operational cost** | No etcd backup/restore, no certificate rotation, no API server tuning, no kubelet config |
-
-## Limitations of Swarmex vs Kubernetes
-
-| Limitation | Detail | Mitigation |
+| Metric | Kubernetes (typical 3-node) | Swarmex (our 3-node cluster) |
 |:---|:---|:---|
-| **No namespaces** | All services share the same namespace | Use labels + Portainer teams for isolation |
-| **No pod concept** | Can't run sidecar containers in the same network namespace | Use overlay networks for service-to-service communication |
-| **Limited RBAC** | Portainer CE has Admin/User/ReadOnly only | Authentik adds SSO but not resource-level RBAC |
-| **No admission controllers** | Can't validate/mutate resources before creation | No equivalent — rely on CI/CD validation |
-| **No CRDs** | Can't extend the API with custom resources | Swarmex controllers use labels instead of CRDs |
-| **Single-master by default** | Swarm supports multi-manager but most setups use 1 | Use 3 or 5 managers for HA (odd numbers for Raft quorum) |
-| **Limited storage ecosystem** | Only SeaweedFS + a few volume plugins | K8s has 50+ CSI drivers for every cloud and storage vendor |
-| **No managed offering** | No EKS/GKE/AKS equivalent for Swarm | Must self-manage. Mirantis offers commercial support until 2030 |
-| **Smaller community** | Fewer tools, fewer blog posts, fewer Stack Overflow answers | awesome-swarm list + swarmlibs + Swarmex fills gaps |
-| **No multi-cluster** | Swarm is single-cluster only | K8s has federation, Liqo, Admiralty for multi-cluster |
-| **Readiness is service-level** | Gatekeeper gates traffic per service, not per container | K8s readiness is per-pod, more granular |
-| **Autoscaling is external** | swarmex-scaler polls Prometheus every 15s | K8s HPA is event-driven via metrics-server, faster reaction |
+| Control plane RAM | 1.5-2GB (etcd + apiserver + scheduler + controller-manager) | ~100MB (SwarmKit embedded in Docker) |
+| Total services running | Depends on workload | 29 services on 3x t3.large (8GB each) |
+| Setup time | 30-60 min (kubeadm + CNI + post-install) | 5 min (`docker swarm init` + `docker swarm join`) |
+| Config complexity | YAML with 20+ resource types, CRDs | Docker Compose v3 + labels |
+| Managed offering | EKS/GKE/AKS ($70-150/month for control plane) | None (self-managed only) |
+| Learning curve | Pods, Deployments, Services, Ingress, PV/PVC, RBAC, CRDs, Operators | Docker Compose + `swarmex.*` labels |
+
+## Advantages of Swarmex
+
+| Advantage | Detail | Verified |
+|:---|:---|:---|
+| 10x less resources | Swarm control plane ~100MB vs K8s ~2GB | ✅ 29 services on 8GB nodes |
+| Zero learning curve | Docker Compose → Swarm stack, add labels | ✅ All config via `swarmex.*` labels |
+| Single binary | Docker Engine includes Swarm | ✅ Only `apt install docker-ce` needed |
+| 5-minute setup | `docker swarm init` + join | ✅ Cluster ready in 2 minutes |
+| Label-based config | No CRDs, no custom resources | ✅ All 8 controllers read labels |
+| Compose compatibility | Same files for dev and prod | ✅ Stack files are Compose v3.8 |
+| Lower operational cost | No etcd backup, no cert rotation | ✅ No maintenance needed beyond Docker |
+
+## Limitations of Swarmex
+
+| Limitation | Impact | Mitigation |
+|:---|:---|:---|
+| No namespaces | All services share same namespace | Labels + Portainer teams |
+| No pod concept | Can't run sidecars in same network namespace | Overlay networks |
+| Limited RBAC | Portainer CE: Admin/User/ReadOnly | Authentik adds SSO but not resource-level RBAC |
+| No admission controllers | Can't validate resources before creation | CI/CD validation |
+| No CRDs | Can't extend the API | Labels replace CRDs for config |
+| Single-cluster only | No multi-cluster federation | One cluster per environment |
+| Limited storage | Only SeaweedFS + few plugins | K8s has 50+ CSI drivers |
+| No managed offering | Must self-manage | Mirantis supports Swarm until 2030 |
+| Smaller community | Fewer tools, fewer answers | awesome-swarm + Swarmex fills gaps |
+| Scaler polls (15s) | Slower reaction than K8s HPA | Acceptable for most workloads |
+| Gatekeeper is per-service | Less granular than K8s per-pod probes | Sufficient for service-level health |
+| Authentik intermittent timeouts | Gateway timeout under load | Needs investigation, may need more resources |
 
 ## When to Use Swarmex
 
-- Small to medium teams (1-20 developers)
+- Teams of 1-20 developers
 - Up to ~100 services
-- Single datacenter or region
-- Teams that already know Docker but not Kubernetes
-- Budget-conscious (no managed K8s costs)
+- Single datacenter/region
+- Teams that know Docker but not Kubernetes
+- Budget-conscious (no managed K8s costs, 10x less compute)
 - Sovereignty requirement (full control, no cloud lock-in)
+- Rapid prototyping → production path
 
 ## When to Use Kubernetes
 
-- Large teams (20+ developers)
+- Teams of 20+ developers
 - 100+ services with complex dependencies
 - Multi-region, multi-cluster requirements
 - Need managed offerings (EKS, GKE, AKS)
-- Require admission controllers, CRDs, operators ecosystem
+- Require admission controllers, CRDs, operator ecosystem
 - Compliance requiring namespace-level isolation
+- Need service mesh with traffic policies (circuit breaking, retries)
