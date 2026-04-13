@@ -32,7 +32,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-      start_period: 30s
     networks:
       - security
       - traefik-public
@@ -124,7 +123,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
-      start_period: 10s
     cap_add:
       - IPC_LOCK
     networks:
