@@ -38,7 +38,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - export AUTHENTIK_SECRET_KEY=$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$(cat
+    - export AUTHENTIK_SECRET_KEY=$$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$$(cat
       /run/secrets/authentik_db_pw) && exec /lifecycle/ak server
   authentik-worker:
     image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
@@ -64,7 +64,7 @@ services:
     entrypoint:
     - /bin/sh
     - -c
-    - export AUTHENTIK_SECRET_KEY=$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$(cat
+    - export AUTHENTIK_SECRET_KEY=$$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$$(cat
       /run/secrets/authentik_db_pw) && exec /lifecycle/ak worker
   authentik-db:
     image: postgres:18-alpine
