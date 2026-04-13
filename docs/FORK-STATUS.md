@@ -47,3 +47,10 @@ This is a problem — the forks should contain our improvements, not the coordin
 2. ~~**Move SeaweedFS entrypoint scripts**~~ ✅ Done — pushed to `ccvass/swarmex/seaweedfs-swarm`
 3. ~~**Archive inactive forks**~~ ✅ Done — coolify, promswarm, swarm-sync, hca, swarm-autoscaler marked archived
 4. ~~**Add CI/CD**~~ ✅ Done — `.gitlab-ci.yml` added to all 8 swarmex controller repos + authentik fork
+
+## Upstream PRs
+
+| PR | Repo | Status | URL |
+|:---|:---|:---|:---|
+| Attr path navigation fix | goauthentik/authentik | Open | https://github.com/goauthentik/authentik/pull/21557 |
+| Swarm overlay IP entrypoints | cycneuramus/seaweedfs-docker-swarm | Open | https://github.com/cycneuramus/seaweedfs-docker-swarm/pull/3 |
