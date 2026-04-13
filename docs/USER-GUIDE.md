@@ -261,74 +261,157 @@ docker logs $(docker ps -q --filter name=swarmex_admission) --tail 5
 
 ### Horizontal Autoscaling (HPA)
 
-Automatically scales replicas based on CPU/RAM usage from Prometheus.
+#### How It Works
+
+The scaler controller runs a reconciliation loop every 15 seconds:
+
+1. Queries Prometheus for CPU and RAM usage of each service: `avg(rate(container_cpu_usage_seconds_total{service="<name>"}[5m]))` and `avg(container_memory_usage_bytes{service="<name>"})`
+2. Compares usage against configured thresholds (default: 70% CPU, 80% RAM)
+3. If usage exceeds threshold: calculates desired replicas = current × (usage / target), capped at `max`
+4. If usage is below threshold × 0.5: scales down, respecting `min`
+5. After scaling, enters cooldown period (default 60s) — no further scaling during this time
+
+The scaler only acts on services with `swarmex.scaler.enabled=true` in deploy labels.
+
+#### Configuration
 
 ```yaml
 deploy:
   labels:
     swarmex.scaler.enabled: "true"
-    swarmex.scaler.min: "2"
-    swarmex.scaler.max: "10"
-    swarmex.scaler.cpu-target: "70"     # Scale up at 70% CPU
-    swarmex.scaler.ram-target: "80"     # Scale up at 80% RAM
-    swarmex.scaler.cooldown: "60"       # Wait 60s between scale events
+    swarmex.scaler.min: "2"          # Never fewer than 2 replicas
+    swarmex.scaler.max: "10"         # Never more than 10 replicas
+    swarmex.scaler.cpu-target: "70"  # Scale up when avg CPU > 70%
+    swarmex.scaler.ram-target: "80"  # Scale up when avg RAM > 80%
+    swarmex.scaler.cooldown: "60"    # Wait 60s between scale events
 ```
 
-The scaler queries Prometheus every 15 seconds. When usage exceeds the target, it adds replicas. When usage drops, it removes them (respecting the minimum).
+#### Observable Behavior
+
+```bash
+# Check scaler decisions
+docker logs $(docker ps -q --filter name=swarmex_scaler) --tail 20
+# Look for: "scaling service" with old→new replica count
+```
 
 ### Vertical Autoscaling (VPA)
 
-Automatically adjusts CPU/RAM limits based on actual usage (20% headroom above real consumption).
+#### How It Works
+
+The VPA controller runs an evaluation cycle every 30 seconds:
+
+1. Queries Prometheus for actual CPU and memory usage of each VPA-enabled service
+2. Calculates target limits: `actual_usage × 1.2` (20% headroom)
+3. Clamps the target between configured min and max values
+4. Only updates if the change exceeds 10% (avoids constant small adjustments)
+5. Calls `docker service update` to change the resource limits
+
+This means an idle nginx using 7MB of RAM with a 512MB limit will be reduced to ~32MB (the configured minimum), freeing 480MB for other services.
+
+#### Configuration
 
 ```yaml
 deploy:
   labels:
     swarmex.vpa.enabled: "true"
-    swarmex.vpa.min-memory: "64M"
-    swarmex.vpa.max-memory: "2G"
-    swarmex.vpa.min-cpu: "0.1"
-    swarmex.vpa.max-cpu: "2.0"
+    swarmex.vpa.min-memory: "64M"    # Never set limit below 64MB
+    swarmex.vpa.max-memory: "2G"     # Never set limit above 2GB
+    swarmex.vpa.min-cpu: "0.1"       # Never set limit below 0.1 CPU
+    swarmex.vpa.max-cpu: "2.0"       # Never set limit above 2.0 CPU
 ```
 
-VPA evaluates every 30 seconds. If the service uses 50MB of RAM but has a 512MB limit, VPA reduces the limit to ~64MB (actual usage × 1.2, clamped to min/max). This frees resources for other services.
+#### Observable Behavior
 
-You can use HPA and VPA together — HPA scales horizontally, VPA optimizes each replica's resources.
+```bash
+docker logs $(docker ps -q --filter name=swarmex_vpa) --tail 20
+# Look for: "vpa adjusted" with cpu old→new, mem old→new
+# Verify: docker service inspect <svc> --format '{{.Spec.TaskTemplate.Resources.Limits}}'
+```
+
+You can use HPA and VPA together — HPA scales the number of replicas, VPA optimizes each replica's resource allocation.
 
 ## 7. Namespace Isolation and Network Policies
 
-### Creating Namespaces
+### How Namespaces Work
 
-Add a namespace label to isolate your service in its own overlay network:
+The namespaces controller watches for services with a `swarmex.namespace` label:
+
+1. On service create/update, reads the `swarmex.namespace` label value
+2. Creates an overlay network named `ns-<namespace>` if it doesn't exist
+3. Attaches the service to that network via `docker service update --network-add`
+4. Services in the same namespace share a network and can communicate via DNS
+5. Services in different namespaces are on separate overlay networks — no connectivity by default
+
+#### Configuration
 
 ```yaml
-labels:
-  swarmex.namespace: "production"
+deploy:
+  labels:
+    swarmex.namespace: "production"
 ```
 
-This creates an overlay network `ns-production` and attaches the service. Services in different namespaces cannot communicate by default.
+This creates `ns-production` overlay network and attaches the service. All services with `swarmex.namespace: "production"` can reach each other by service name.
 
-### Allowing Cross-Namespace Traffic
+#### Observable Behavior
 
-To allow a backend service to receive traffic from the frontend namespace:
+```bash
+# See namespace networks
+docker network ls --filter name=ns-
 
-```yaml
-# On the backend service
-labels:
-  swarmex.namespace: "backend"
-  swarmex.netpolicy.allow: "ns-frontend"
+# Check which network a service is on
+docker service inspect <svc> --format '{{range .Spec.TaskTemplate.Networks}}{{.Target}} {{end}}'
 ```
 
-Multiple namespaces can be allowed with comma separation:
+### How Network Policies Work
+
+The netpolicy controller enables cross-namespace communication:
+
+1. Watches for services with `swarmex.netpolicy.allow` label
+2. Parses the comma-separated list of namespace names
+3. For each allowed namespace, attaches the service to that namespace's overlay network
+4. The service can now receive traffic from services in the allowed namespaces
+
+This is an additive model — you grant access, not deny it. By default, namespaces are isolated.
+
+#### Configuration
 
 ```yaml
-swarmex.netpolicy.allow: "ns-frontend,ns-monitoring"
+# Backend service in "backend" namespace, allowing traffic from "frontend"
+deploy:
+  labels:
+    swarmex.namespace: "backend"
+    swarmex.netpolicy.allow: "ns-frontend"
+```
+
+Multiple namespaces:
+
+```yaml
+    swarmex.netpolicy.allow: "ns-frontend,ns-monitoring"
+```
+
+#### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_netpolicy) --tail 10
+# Look for: "cross-namespace access granted" with service and network names
 ```
 
 ## 8. Secret Management
 
-### Storing Secrets in OpenBao
+### How Vault-Sync Works
 
-First, write secrets to OpenBao:
+The vault-sync controller bridges OpenBao (Vault-compatible) with Docker services:
+
+1. Watches for services with `swarmex.vault.enabled=true`
+2. Reads the configured OpenBao path (e.g., `secret/data/my-app`)
+3. Fetches all key-value pairs from that path using the OpenBao HTTP API
+4. Writes each key as a file in `/run/secrets/swarmex/` (tmpfs mount — never touches disk)
+5. Sends the configured signal (default: SIGHUP) to the service containers so they reload
+6. Repeats every `refresh` interval (default: 300 seconds)
+
+The vault token is read from `VAULT_TOKEN` env var or `VAULT_TOKEN_FILE` (Docker secret).
+
+### Storing Secrets in OpenBao
 
 ```bash
 # From the manager node
@@ -344,18 +427,52 @@ docker exec -e VAULT_ADDR=http://127.0.0.1:8200 \
 deploy:
   labels:
     swarmex.vault.enabled: "true"
-    swarmex.vault.path: "secret/data/my-app"
-    swarmex.vault.refresh: "300"        # Re-read every 5 minutes
-    swarmex.vault.signal: "SIGHUP"      # Signal app to reload
+    swarmex.vault.path: "secret/data/my-app"   # OpenBao KV v2 path
+    swarmex.vault.refresh: "300"                # Re-read every 5 minutes
+    swarmex.vault.signal: "SIGHUP"             # Signal to send on rotation
 ```
 
-Vault-sync writes secrets as files to `/run/secrets/swarmex/` inside the container. Your app reads them from there. When secrets change in OpenBao, vault-sync updates the files and sends the configured signal.
+### How Your App Reads Secrets
+
+Secrets appear as files:
+
+```
+/run/secrets/swarmex/db_password    → contains "secret123"
+/run/secrets/swarmex/api_key        → contains "abc456"
+```
+
+Your app reads them at startup and on SIGHUP:
+
+```python
+# Python example
+db_password = open("/run/secrets/swarmex/db_password").read().strip()
+```
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_vault-sync) --tail 10
+# Look for: "secrets synced" with service name and key count
+# Error: "vault read failed" means OpenBao is unreachable or path doesn't exist
+```
 
 ## 9. Blue/Green Deployments
 
-### How It Works
+### How the Deployer Works
 
-The deployer creates a parallel "green" service with the new image, shifts Traefik traffic gradually, and removes the old "blue" service if healthy.
+The deployer controller manages zero-downtime deployments:
+
+1. Detects services with `swarmex.deployer.strategy=blue-green` and a `green-image` label
+2. Creates a parallel "green" service (`<name>-green`) with the new image
+3. Waits for the green service to become healthy (Docker HEALTHCHECK)
+4. Gradually shifts Traefik traffic weights: blue 100/green 0 → 80/20 → 60/40 → ... → 0/100
+5. Each shift waits `shift-interval` (default 30s) before the next step
+6. If error rate exceeds threshold during any step, rolls back all traffic to blue
+7. After full cutover, removes the old blue service and renames green to blue
+
+The deployer manages Traefik labels on both services to control traffic distribution.
+
+### Configuration
 
 ```yaml
 deploy:
@@ -363,34 +480,71 @@ deploy:
     swarmex.deployer.enabled: "true"
     swarmex.deployer.strategy: "blue-green"
     swarmex.deployer.green-image: "registry.example.com/my-app:v2"
-    swarmex.deployer.shift-interval: "30s"
-    swarmex.deployer.shift-step: "20"
-    swarmex.deployer.rollback-on-fail: "true"
+    swarmex.deployer.shift-interval: "30s"   # 30s between weight shifts
+    swarmex.deployer.shift-step: "20"        # Shift 20% per step
+    swarmex.deployer.rollback-on-fail: "true" # Auto-rollback on errors
 ```
 
-Traffic flow: 100/0 → 80/20 → 60/40 → 40/60 → 20/80 → 0/100 (then remove blue).
+Traffic flow over time:
 
-If error rate exceeds the threshold during any step, traffic shifts back to blue automatically.
+```
+t=0s    blue=100%  green=0%    (green service created)
+t=30s   blue=80%   green=20%   (first shift)
+t=60s   blue=60%   green=40%
+t=90s   blue=40%   green=60%
+t=120s  blue=20%   green=80%
+t=150s  blue=0%    green=100%  (cutover complete, blue removed)
+```
 
-### Readiness Gates
+### Combining with Readiness Gates
 
-Combine with gatekeeper to ensure the green service is healthy before receiving traffic:
+The gatekeeper controller ensures Traefik only routes to healthy services:
+
+1. Periodically sends HTTP requests to the configured health path
+2. Counts consecutive successes (threshold, default 3)
+3. When threshold is met, adds `traefik.enable=true` label to the service
+4. If health check fails, removes the Traefik label — traffic stops immediately
 
 ```yaml
 deploy:
   labels:
     swarmex.gatekeeper.enabled: "true"
-    swarmex.gatekeeper.path: "/health/ready"
-    swarmex.gatekeeper.interval: "5s"
-    swarmex.gatekeeper.threshold: "3"
+    swarmex.gatekeeper.path: "/health/ready"  # HTTP path to probe
+    swarmex.gatekeeper.interval: "5s"         # Check every 5 seconds
+    swarmex.gatekeeper.timeout: "3s"          # Timeout per check
+    swarmex.gatekeeper.threshold: "3"         # 3 consecutive successes to pass
     swarmex.deployer.enabled: "true"
     swarmex.deployer.strategy: "blue-green"
     swarmex.deployer.green-image: "registry.example.com/my-app:v2"
 ```
 
+### Observable Behavior
+
+```bash
+# Deployer logs
+docker logs $(docker ps -q --filter name=swarmex_deployer) --tail 20
+# Look for: "green service created", "shifting traffic", "cutover complete"
+
+# Gatekeeper logs
+docker logs $(docker ps -q --filter name=swarmex_gatekeeper) --tail 20
+# Look for: "service READY, enabling Traefik" or "service NOT READY, disabling Traefik"
+```
+
 ## 10. Database Workloads
 
-### PostgreSQL with Automatic Failover
+### How Operator-DB Works
+
+The operator-db controller provides automated health monitoring and failover for databases:
+
+1. Watches for services with `swarmex.operator.enabled=true`
+2. Every 15 seconds, performs TCP health checks on the configured port for each task (replica)
+3. Counts healthy replicas (successful TCP connection within 3 seconds)
+4. If healthy count drops below `min-ready` (default 1), triggers failover
+5. Failover = `docker service update --force` which kills the unhealthy task and schedules a new one
+
+The operator does NOT manage replication, clustering, or data consistency — it only ensures the database container is running and accepting TCP connections.
+
+### Configuration
 
 ```yaml
 services:
@@ -406,38 +560,142 @@ services:
         limits:
           memory: 512M
       labels:
+        team: my-team
         swarmex.operator.enabled: "true"
-        swarmex.operator.type: "postgresql"
-        swarmex.operator.port: "5432"
-    labels:
-      team: my-team
+        swarmex.operator.type: "postgresql"   # Logged for context, no behavior change
+        swarmex.operator.port: "5432"         # TCP port to health-check
+        swarmex.operator.min-ready: "1"       # Minimum healthy replicas
     volumes:
       - db-data:/var/lib/postgresql/data
 ```
 
-The operator-db controller monitors TCP health on port 5432. If the container becomes unreachable, it force-updates the service to trigger a restart on a healthy node.
+### Observable Behavior
 
-## 11. Traffic Policies
+```bash
+docker logs $(docker ps -q --filter name=swarmex_operator-db) --tail 20
+# Healthy: "operator watching DB service" with service name and engine
+# Unhealthy: "DB service unhealthy" with healthy count and min_ready
+# Failover: "failover triggered" with service name and engine
+```
 
-### Retries, Rate Limiting, Circuit Breaking
+### Self-Healing with Remediation
 
-Applied via Traefik middlewares automatically:
+For additional protection, combine with remediation:
 
 ```yaml
 deploy:
   labels:
+    swarmex.operator.enabled: "true"
+    swarmex.operator.port: "5432"
+    swarmex.remediation.enabled: "true"
+    swarmex.remediation.failure-threshold: "3"
+```
+
+Remediation provides a three-step escalation chain:
+
+1. **Restart** — `docker service update --force` (same as operator-db failover)
+2. **Force-restart** — removes and recreates the task
+3. **Drain node** — marks the node as `Drain` to move all services to other nodes (never drains the last active manager)
+
+The failure counter resets after 5 minutes of no failures.
+
+## 11. Traffic Policies
+
+### How It Works
+
+The traffic controller watches for services with `swarmex.traffic.*` labels and automatically creates Traefik middlewares:
+
+1. On service create/update, reads traffic policy labels
+2. For each policy, creates a corresponding Traefik middleware via deploy labels:
+   - `retry` → `traefik.http.middlewares.<svc>-retry.retry.attempts=<N>`
+   - `rate-limit` → `traefik.http.middlewares.<svc>-ratelimit.ratelimit.average=<N>`
+   - `circuit-breaker` → `traefik.http.middlewares.<svc>-cb.circuitbreaker.expression=ResponseCodeRatio(500,600,0,600) > <threshold>`
+3. Attaches all middlewares to the service's Traefik router
+
+You don't need to configure Traefik directly — the controller manages all middleware labels.
+
+### Configuration
+
+```yaml
+deploy:
+  labels:
+    # Traefik routing (required)
+    traefik.enable: "true"
+    traefik.http.routers.myapp.rule: "Host(`myapp.example.com`)"
+    traefik.http.routers.myapp.tls.certresolver: "le"
+    traefik.http.services.myapp.loadbalancer.server.port: "8080"
+    # Traffic policies (Swarmex manages the middlewares)
     swarmex.traffic.retry: "3"              # Retry failed requests 3 times
-    swarmex.traffic.rate-limit: "100"       # Max 100 requests/second
+    swarmex.traffic.rate-limit: "100"       # Max 100 requests/second average
+    swarmex.traffic.rate-burst: "200"       # Allow bursts up to 200 req/s
     swarmex.traffic.circuit-breaker: "0.5"  # Open circuit at 50% error rate
 ```
 
-These create Traefik middlewares attached to your service's router. No Traefik configuration needed — the traffic controller handles it.
+### What Each Policy Does
+
+**Retry**: When a request fails (5xx response or connection error), Traefik retries it up to N times on different backend instances. Useful for transient failures.
+
+**Rate Limit**: Limits incoming requests to N per second (average) with optional burst. Requests exceeding the limit get HTTP 429 Too Many Requests.
+
+**Circuit Breaker**: Monitors the ratio of 5xx responses. When the error ratio exceeds the threshold (0.0–1.0), the circuit opens and all requests get HTTP 503 for a recovery period. After recovery, the circuit closes and traffic resumes.
+
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_traffic) --tail 10
+# Look for: "traffic policies applied" with policy names
+
+# Verify middlewares were created
+docker service inspect <svc> --format '{{json .Spec.Labels}}' | python3 -m json.tool | grep middleware
+```
 
 ## 12. Multi-Cluster Federation
 
+### How It Works
+
+The federation controller replicates services across Swarm clusters:
+
+1. Connects to remote Docker APIs via TCP (configured via `FEDERATION_CLUSTER_<NAME>` env vars)
+2. Watches for services with `swarmex.federation.replicate=true`
+3. Reads `swarmex.federation.clusters` to determine target clusters
+4. On service create: calls `docker service create` on each remote cluster with the same image, replicas, environment variables, labels, and resource limits
+5. On service update: calls `docker service update` on each remote cluster to sync changes
+6. If the service already exists on the remote, it updates instead of creating
+
+#### What Gets Replicated
+
+- Image and tag
+- Replica count
+- Environment variables
+- Service labels
+- Resource limits (CPU, memory)
+
+#### What Does NOT Get Replicated
+
+- Volumes (must exist on remote cluster)
+- Docker secrets and configs (must be created on remote)
+- Network attachments (remote cluster uses its own networks)
+- Placement constraints (remote cluster has different nodes)
+
 ### Setup
 
-Federation replicates services to remote Swarm clusters. Configure the federation controller with remote cluster endpoints:
+#### 1. Enable Docker TCP API on Remote Cluster Manager
+
+```bash
+# On the remote manager node
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo tee /etc/systemd/system/docker.service.d/override.conf << EOF
+[Service]
+ExecStart=
+ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2376 --containerd=/run/containerd/containerd.sock
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+**Security warning**: This exposes the Docker API without authentication. For production, use TLS mutual authentication or a VPN.
+
+#### 2. Configure Federation Controller
 
 ```bash
 docker service update \
@@ -446,28 +704,32 @@ docker service update \
   swarmex_federation
 ```
 
-The remote clusters need Docker TCP API enabled (port 2376).
-
-### Replicating a Service
+#### 3. Replicate a Service
 
 ```yaml
 deploy:
   labels:
     swarmex.federation.replicate: "true"
-    swarmex.federation.clusters: "gcp,azure"   # Which clusters to replicate to
+    swarmex.federation.clusters: "gcp,azure"   # Comma-separated cluster names
 ```
 
-The federation controller creates the same service on the remote clusters. When you update the service (image, replicas, config), the changes sync automatically.
+### Verified: AWS → GCP Cross-Cloud
 
-### What Gets Replicated
+Tested with a temporary 3-node GCP cluster:
 
-- Image and tag
-- Replica count
-- Environment variables
-- Labels
-- Resource limits
+1. Federation connected: `"connected to remote cluster", cluster=gcp`
+2. Created `fed-test` (nginx, 2 replicas) → appeared on GCP as `fed-test 2/2`
+3. Updated image to httpd → GCP synced: `"federation updated", service=fed-test`
 
-What does NOT get replicated: volumes, secrets, configs (these must exist on the remote cluster).
+### Observable Behavior
+
+```bash
+docker logs $(docker ps -q --filter name=swarmex_federation) --tail 10
+# "connected to remote cluster" — startup, one per remote
+# "federation replicated" — new service created on remote
+# "federation updated" — existing service updated on remote
+# "unknown remote cluster" — cluster name in label doesn't match any FEDERATION_CLUSTER_* env var
+```
 
 ## 13. Monitoring and Logging
 
