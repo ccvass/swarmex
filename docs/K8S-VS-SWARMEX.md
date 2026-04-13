@@ -78,16 +78,19 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 
 ## When to Use Each
 
-| Scenario | Recommendation |
-|:---|:---|
-| Small team, simple services | **Swarmex** — less overhead, faster setup |
-| Large team, complex microservices | **Kubernetes** — namespaces, RBAC, CRDs |
-| Budget-conscious | **Swarmex** — 10x less compute, no managed fees |
-| Multi-region deployment | **Kubernetes** — multi-cluster federation |
-| Compliance (SOC2, HIPAA) | **Kubernetes** — namespace isolation, network policies, audit |
-| Rapid prototyping | **Swarmex** — Docker Compose to production in minutes |
-| Existing Docker Compose setup | **Swarmex** — zero migration effort |
-| Need managed service | **Kubernetes** — EKS/GKE/AKS |
-| Sovereignty / no cloud lock-in | **Swarmex** — runs anywhere Docker runs |
-| Already know Kubernetes | **Kubernetes** — don't switch |
-| Don't know either | **Swarmex** — much easier to learn |
+| Scenario | Recommendation | Why |
+|:---|:---|:---|
+| Any team size, trusting environment | **Swarmex** | No technical scale limit. Less overhead. |
+| Multi-tenant with isolation requirements | **Kubernetes** | Namespaces + network policies for tenant isolation |
+| Compliance (SOC2, HIPAA, PCI-DSS) | **Kubernetes** | Namespace isolation, network policies, audit logs |
+| Multi-region deployment | **Kubernetes** | Multi-cluster federation |
+| Budget-conscious | **Swarmex** | 10x less compute, no managed fees |
+| Rapid prototyping → production | **Swarmex** | Docker Compose to production in minutes |
+| Existing Docker Compose setup | **Swarmex** | Zero migration effort |
+| Need managed service (no ops team) | **Kubernetes** | EKS/GKE/AKS |
+| Sovereignty / no cloud lock-in | **Swarmex** | Runs anywhere Docker runs |
+| Already invested in K8s ecosystem | **Kubernetes** | Don't migrate |
+| Starting fresh, want simplicity | **Swarmex** | Much easier to learn and operate |
+| Need CRDs / operator ecosystem | **Kubernetes** | Swarmex uses labels, not extensible API |
+
+**Note:** Team size is NOT a factor. Swarmex scales to the same number of services as Kubernetes. The difference is governance features (namespaces, network policies, granular RBAC), not capacity.
