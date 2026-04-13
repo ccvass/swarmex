@@ -2,7 +2,7 @@
 
 Enterprise-grade orchestration for Docker Swarm — closing every feature gap with Kubernetes via lightweight Go controllers configured through Docker labels.
 
-**38 services running on a 3-node cluster. 16 controllers verified end-to-end. Cross-cloud federation tested (AWS ↔ GCP). 100% open source.**
+**38 services running on a 3-node cluster. 17 controllers (16 verified + 1 new) end-to-end. Cross-cloud federation tested (AWS ↔ GCP). 100% open source.**
 
 ## Why Swarmex
 
@@ -42,7 +42,7 @@ No CRDs. No operators. No YAML complexity. Just labels.
                          │  Docker Socket (/var/run/docker.sock)          │
                          │       │                                        │
                          │  ┌────┴──────────────────────────────────┐     │
-                         │  │         16 Swarmex Controllers        │     │
+                         │  │         17 Swarmex Controllers        │     │
                          │  │                                       │     │
                          │  │  event-controller ──► scaler          │     │
                          │  │                  ──► gatekeeper       │     │
@@ -106,6 +106,7 @@ Swarmex has 16 controllers organized in three tiers. Each is a single Go binary 
 | `traffic` | Circuit breaker, retries, rate limiting via Traefik middlewares | retry + rate-limit policies applied to test-app |
 | `federation` | Multi-cluster service replication across clouds | **AWS→GCP cross-cloud replication verified** (see below) |
 | `api` | Custom resource API server with persistent storage (bbolt) | CRUD verified; resources survive container restart |
+| `cluster-scaler` | Auto-provision/deprovision cloud nodes based on CPU | ⏳ Built, pending test |
 
 ## Cross-Cloud Federation
 
