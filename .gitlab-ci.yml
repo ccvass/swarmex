@@ -1,0 +1,21 @@
+stages:
+  - build
+
+build-authentik:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"${CI_REGISTRY}\":{\"username\":\"${REGISTRY_USER}\",\"password\":\"${REGISTRY_PASSWORD}\"}}}"
+      > /kaniko/.docker/config.json
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}/docker/authentik"
+      --dockerfile "${CI_PROJECT_DIR}/docker/authentik/Dockerfile"
+      --destination "${CI_REGISTRY_IMAGE}/authentik-patched:latest"
+      --destination "${CI_REGISTRY_IMAGE}/authentik-patched:2024.8.3"
+  only:
+    - main
+  changes:
+    - docker/authentik/**/*
