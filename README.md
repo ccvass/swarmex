@@ -333,7 +333,7 @@ sequenceDiagram
 | [FORK-STATUS.md](docs/FORK-STATUS.md) | Fork analysis, what was changed, upstream PR status |
 | [ROADMAP.md](ROADMAP.md) | Implementation phases and OSS resource mapping |
 | [STANDARDS.md](STANDARDS.md) | Go 1.26, project patterns, deploy conventions |
-| [configs/labels.md](configs/labels.md) | Complete `swarmex.*` label reference |
+| [configs/LABELS.md](configs/LABELS.md) | Complete `swarmex.*` label reference |
 
 ## License
 
