@@ -1,184 +1,148 @@
 version: "3.8"
 
-# Swarmex controllers stack
-# Deploy: docker stack deploy -c stacks/swarmex.yml swarmex
-# Requires: observability, ingress stacks deployed first
+# Swarmex controllers stack — all 16 controllers
+# Deploy: docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
+# Requires: observability, ingress, security stacks deployed first
+
+x-defaults: &defaults
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+  deploy:
+    mode: replicated
+    replicas: 1
+    placement:
+      constraints: [node.role == manager]
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+  networks:
+    - swarmex
 
 services:
+  # === Core (8) ===
   event-controller:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-event-controller:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - swarmex
 
   scaler:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-scaler:latest
     environment:
-      - PROMETHEUS_URL=http://prometheus:9090
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
       - swarmex
       - monitoring
 
   gatekeeper:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-gatekeeper:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
     networks:
       - swarmex
       - traefik-public
 
   remediation:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-remediation:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
     networks:
       - swarmex
       - monitoring
 
   deployer:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-deployer:latest
     environment:
-      - PROMETHEUS_URL=http://prometheus:9090
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-      labels:
-        traefik.enable: "true"
-        traefik.http.routers.deployer.rule: "Host(`deploy.${DOMAIN:-localhost}`)"
-        traefik.http.routers.deployer.tls.certresolver: "le"
-        traefik.http.services.deployer.loadbalancer.server.port: "8080"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
       - swarmex
       - monitoring
       - traefik-public
 
   vault-sync:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-vault-sync:latest
     environment:
       - VAULT_ADDR=http://openbao:8200
-      - VAULT_TOKEN_FILE=/run/secrets/vault_token
+      - VAULT_TOKEN_FILE=/run/secrets/openbao_root_token
     secrets:
-      - vault_token
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - swarmex_secrets:/run/secrets/swarmex
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - openbao_root_token
     networks:
       - swarmex
       - security
 
   operator-db:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-operator-db:latest
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    networks:
-      - swarmex
 
   nano-mesh:
+    <<: *defaults
     image: registry.labtau.com/ccvass/swarmex/swarmex-nano-mesh:latest
+
+  # === Governance (4) ===
+  namespaces:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-namespaces:latest
+
+  netpolicy:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-netpolicy:latest
+
+  rbac:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-rbac:latest
+
+  admission:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-admission:latest
+    configs:
+      - source: admission-rules
+        target: /etc/swarmex/admission.yaml
     environment:
-      - EASYTIER_PEER=${EASYTIER_PEER:-}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - ADMISSION_CONFIG=/etc/swarmex/admission.yaml
+
+  # === Advanced (4) ===
+  vpa:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-vpa:latest
+    environment:
+      - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
       - swarmex
+      - monitoring
+
+  traffic:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-traffic:latest
+    networks:
+      - swarmex
+      - traefik-public
+
+  federation:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-federation:latest
+
+  api:
+    <<: *defaults
+    image: registry.labtau.com/ccvass/swarmex/swarmex-api:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - api-data:/data
 
 volumes:
-  swarmex_secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
+  api-data:
+
+configs:
+  admission-rules:
+    external: true
 
 secrets:
-  vault_token:
+  openbao_root_token:
     external: true
 
 networks:
   swarmex:
-    driver: overlay
-    attachable: true
+    external: true
   monitoring:
     external: true
   traefik-public:

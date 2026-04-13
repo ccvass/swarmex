@@ -1,0 +1,14 @@
+rules:
+  - name: require-memory-limit
+    validate:
+      message: "Service must have a memory limit"
+      require_memory_limit: true
+  - name: require-team-label
+    validate:
+      message: "Service must have a team label"
+      require_labels:
+        - team
+  - name: add-managed-by
+    mutate:
+      add_labels:
+        managed-by: swarmex
