@@ -169,13 +169,12 @@ class ConfigLoader:
 
     def update(self, root: dict[str, Any], updatee: dict[str, Any]) -> dict[str, Any]:
         """Recursively update dictionary"""
+        from authentik.lib.utils.dict import _unwrap
+        root = _unwrap(root)
         for key, raw_value in updatee.items():
             if isinstance(raw_value, Mapping):
                 existing = root.get(key, {})
-                # Unwrap Attr containing a dict for recursive update
-                from authentik.lib.config import Attr as _Attr
-                if isinstance(existing, _Attr) and isinstance(existing.value, dict):
-                    existing = existing.value
+                existing = _unwrap(existing)
                 root[key] = self.update(existing, raw_value)
             else:
                 if isinstance(raw_value, str):
