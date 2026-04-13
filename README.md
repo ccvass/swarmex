@@ -252,6 +252,18 @@ Cluster autoscaling was tested by generating CPU load (12 stress containers) —
 
 ## Quick Start
 
+### Automated Install (Recommended)
+
+```bash
+git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
+cd swarmex-coordinator
+bash scripts/install.sh
+```
+
+The installer asks for your manager IP, domain, credentials, and optional cloud provider for autoscaling. It deploys all 6 stacks, creates secrets, and verifies the installation. Takes ~5 minutes.
+
+### Manual Install
+
 ```bash
 # Clone
 git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
