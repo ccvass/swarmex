@@ -144,10 +144,10 @@ services:
           memory: 256M
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true
+      - CMD-SHELL
+      - wget -qO- http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true
+        2>/dev/null || curl -sf http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3

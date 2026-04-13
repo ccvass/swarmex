@@ -35,10 +35,9 @@ services:
         team: platform
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://localhost:9090/-/healthy
+      - CMD-SHELL
+      - wget -qO- http://localhost:9090/-/healthy 2>/dev/null || curl -sf http://localhost:9090/-/healthy
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
@@ -68,10 +67,9 @@ services:
           memory: 256M
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://localhost:3000/api/health
+      - CMD-SHELL
+      - wget -qO- http://localhost:3000/api/health 2>/dev/null || curl -sf http://localhost:3000/api/health
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
@@ -97,10 +95,9 @@ services:
         team: platform
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://localhost:3100/ready
+      - CMD-SHELL
+      - wget -qO- http://localhost:3100/ready 2>/dev/null || curl -sf http://localhost:3100/ready
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
@@ -124,10 +121,9 @@ services:
           memory: 512M
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://localhost:3200/ready
+      - CMD-SHELL
+      - wget -qO- http://localhost:3200/ready 2>/dev/null || curl -sf http://localhost:3200/ready
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
@@ -151,10 +147,9 @@ services:
           memory: 256M
     healthcheck:
       test:
-      - CMD
-      - wget
-      - -qO-
-      - http://localhost:9093/-/healthy
+      - CMD-SHELL
+      - wget -qO- http://localhost:9093/-/healthy 2>/dev/null || curl -sf http://localhost:9093/-/healthy
+        2>/dev/null || exit 1
       interval: 15s
       timeout: 5s
       retries: 3
