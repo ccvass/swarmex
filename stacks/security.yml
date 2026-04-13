@@ -6,7 +6,7 @@ version: "3.8"
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:2024.8.3
+    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
     command: server
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
@@ -37,7 +37,7 @@ services:
       - traefik-public
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2024.8.3
+    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
     command: worker
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret

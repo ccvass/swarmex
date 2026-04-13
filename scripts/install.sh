@@ -159,25 +159,23 @@ info "Registry login OK"
 # ─── Create secrets ───────────────────────────────────────────────────
 info "Creating Docker secrets..."
 $SSH "
-echo -n '$AK_DB_PASS' | docker secret create authentik_db_password - 2>/dev/null || true
-echo -n '$AK_SECRET' | docker secret create authentik_secret_key - 2>/dev/null || true
-echo -n '$GF_PASS' | docker secret create grafana_admin_password - 2>/dev/null || true
+echo -n '$AK_DB_PASS' | docker secret create authentik_db_pw - 2>/dev/null || true
+echo -n '$AK_SECRET' | docker secret create authentik_secret - 2>/dev/null || true
+echo -n '$GF_PASS' | docker secret create grafana_admin_pw - 2>/dev/null || true
 " >/dev/null
 if [ -n "$CF_TOKEN" ]; then
   $SSH "echo -n '$CF_TOKEN' | docker secret create cloudflare_api_token - 2>/dev/null || true" >/dev/null
 fi
 info "Secrets created"
 
-# ─── Clone repo ───────────────────────────────────────────────────────
-info "Deploying Swarmex to manager..."
-$SSH "
-cd /tmp
-rm -rf swarmex-coordinator
-git clone --depth 1 https://oauth2:$REG_PASS@scovil.labtau.com/ccvass/swarmex/swarmex-coordinator.git 2>/dev/null || \
-git clone --depth 1 git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git 2>/dev/null
-cd swarmex-coordinator
-" 2>/dev/null
-info "Repository cloned"
+# ─── Upload repo to manager ───────────────────────────────────────────
+info "Uploading Swarmex to manager..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+tar czf /tmp/swarmex-deploy.tar.gz -C "$SCRIPT_DIR" \
+  stacks configs scripts docker 2>/dev/null
+scp -o ConnectTimeout=5 -i "$SSH_KEY" /tmp/swarmex-deploy.tar.gz "$SSH_USER@$MANAGER_IP:/tmp/" >/dev/null
+$SSH "mkdir -p /tmp/swarmex-coordinator && cd /tmp/swarmex-coordinator && tar xzf /tmp/swarmex-deploy.tar.gz" >/dev/null
+info "Files uploaded"
 
 # ─── Pre-deploy (networks + configs) ─────────────────────────────────
 info "Creating overlay networks and configs..."
