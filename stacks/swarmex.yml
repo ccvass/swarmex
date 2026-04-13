@@ -12,6 +12,11 @@ x-defaults: &defaults
     replicas: 1
     placement:
       constraints: [node.role == manager]
+    resources:
+      limits:
+        memory: 128M
+    labels:
+      team: platform
   healthcheck:
     test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
     interval: 10s

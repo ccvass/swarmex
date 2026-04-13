@@ -576,8 +576,26 @@ Swarmex enforces rules on every new service (including `docker stack deploy`). S
 | Rule | Effect |
 |:---|:---|
 | `require-memory-limit` | Service must have `deploy.resources.limits.memory` set |
-| `require-team-label` | Service must have a `team` label |
+| `require-team-label` | Service must have a `team` label in `deploy.labels` |
 | `add-managed-by` | Automatically adds `managed-by: swarmex` label |
+
+**Important:** The `team` label must be in `deploy.labels` (service-level), not in the top-level `labels` (container-level). Admission reads Swarm service labels which map to `deploy.labels` in Docker Compose.
+
+```yaml
+services:
+  web:
+    # ❌ This does NOT satisfy admission (container label)
+    labels:
+      team: my-team
+
+    deploy:
+      # ✅ This satisfies admission (service label)
+      labels:
+        team: my-team
+      resources:
+        limits:
+          memory: 256M    # Also required
+```
 
 ### Customizing Rules
 
