@@ -30,9 +30,9 @@ Feature-by-feature comparison. No opinions — just what each one does and doesn
 | **GitOps** | ✅ ArgoCD / Flux (sync waves, app-of-apps) | ✅ swarm-cd (repos.yaml + stacks.yaml, UI) | ArgoCD is more powerful; swarm-cd is simpler |
 | **RBAC** | ✅ Built-in (verbs × resources × namespaces) | ✅ Portainer CE + Authentik | K8s RBAC is more granular |
 | **Namespaces** | ✅ Built-in (resource isolation, quotas) | ❌ Not available | K8s advantage |
-| **Resource quotas** | ✅ Per-namespace quotas | ❌ Not available | K8s advantage |
-| **Network policies** | ✅ NetworkPolicy (pod-level firewall) | ❌ Not available | K8s advantage |
-| **Admission controllers** | ✅ Validating/Mutating webhooks | ❌ Not available | K8s advantage |
+| **Resource quotas** | ✅ Per-namespace quotas | 🔜 Part of swarmex-namespaces #36 | Planned |
+| **Network policies** | ✅ NetworkPolicy | 🔜 swarmex-netpolicy #37 (iptables per service) | Planned |
+| **Admission controllers** | ✅ Webhooks | 🔜 swarmex-admission #39 (post-creation validate/mutate) | Planned |
 | **Custom Resource Definitions** | ✅ CRDs + Operators | ❌ Uses labels instead | Different approach, not a gap |
 | **Multi-cluster** | ✅ Federation, Liqo, Admiralty | ❌ Single cluster only | K8s advantage |
 | **Managed offerings** | ✅ EKS, GKE, AKS, DOKS | ❌ Self-managed only | K8s advantage |
