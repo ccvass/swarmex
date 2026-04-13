@@ -10,7 +10,7 @@ services:
     command: server
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
-      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_REDIS__HOST=authentik-valkey
       - AUTHENTIK_POSTGRESQL__HOST=authentik-db
       - AUTHENTIK_POSTGRESQL__USER=authentik
       - AUTHENTIK_POSTGRESQL__NAME=authentik
@@ -41,7 +41,7 @@ services:
     command: worker
     environment:
       - AUTHENTIK_SECRET_KEY__FILE=/run/secrets/authentik_secret
-      - AUTHENTIK_REDIS__HOST=authentik-redis
+      - AUTHENTIK_REDIS__HOST=authentik-valkey
       - AUTHENTIK_POSTGRESQL__HOST=authentik-db
       - AUTHENTIK_POSTGRESQL__USER=authentik
       - AUTHENTIK_POSTGRESQL__NAME=authentik
@@ -56,7 +56,7 @@ services:
       - security
 
   authentik-db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_USER=authentik
       - POSTGRES_DB=authentik
@@ -76,8 +76,8 @@ services:
     networks:
       - security
 
-  authentik-redis:
-    image: redis:7-alpine
+  authentik-valkey:
+    image: valkey/valkey:8-alpine
     volumes:
       - authentik_redis_data:/data
     deploy:
