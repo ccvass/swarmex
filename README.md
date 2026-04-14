@@ -373,13 +373,52 @@ swarmex-coordinator/
     └── USER-GUIDE.md           # How to deploy your app on Swarmex
 ```
 
-## Repositories (31)
+## Repositories
 
-All hosted in the `ccvass/swarmex` GitLab group with CI/CD pipelines building container images via kaniko.
+All source code on [GitHub](https://github.com/ccvass). CI/CD on GitLab (scovil.labtau.com) building container images via kaniko.
 
-- **1** coordinator (this repo)
-- **18** custom controllers (Go, ~8MB each)
-- **1** CLI tool (swarmex-pack — Helm-like packaging)
+### Core — Workload Management
+
+| Controller | Repository | Description |
+|:---|:---|:---|
+| event-controller | [ccvass/swarmex-event-controller](https://github.com/ccvass/swarmex-event-controller) | Central event dispatcher for all controllers |
+| scaler | [ccvass/swarmex-scaler](https://github.com/ccvass/swarmex-scaler) | Horizontal autoscaling (HPA) via Prometheus |
+| gatekeeper | [ccvass/swarmex-gatekeeper](https://github.com/ccvass/swarmex-gatekeeper) | Readiness probes + Traefik traffic gating |
+| remediation | [ccvass/swarmex-remediation](https://github.com/ccvass/swarmex-remediation) | Self-healing escalation + disruption budgets |
+| deployer | [ccvass/swarmex-deployer](https://github.com/ccvass/swarmex-deployer) | Blue/green + canary deployments |
+| vault-sync | [ccvass/swarmex-vault-sync](https://github.com/ccvass/swarmex-vault-sync) | Secret injection from OpenBao with hot-reload |
+| operator-db | [ccvass/swarmex-operator-db](https://github.com/ccvass/swarmex-operator-db) | Database health monitoring + failover |
+| nano-mesh | [ccvass/swarmex-nano-mesh](https://github.com/ccvass/swarmex-nano-mesh) | WireGuard service mesh via EasyTier |
+
+### Governance — Security and Isolation
+
+| Controller | Repository | Description |
+|:---|:---|:---|
+| namespaces | [ccvass/swarmex-namespaces](https://github.com/ccvass/swarmex-namespaces) | Namespace isolation via overlay networks |
+| netpolicy | [ccvass/swarmex-netpolicy](https://github.com/ccvass/swarmex-netpolicy) | Cross-namespace network policies |
+| rbac | [ccvass/swarmex-rbac](https://github.com/ccvass/swarmex-rbac) | Docker socket proxy with JWT + roles |
+| admission | [ccvass/swarmex-admission](https://github.com/ccvass/swarmex-admission) | Validate/mutate services + namespace quotas |
+
+### Advanced — Enterprise Features
+
+| Controller | Repository | Description |
+|:---|:---|:---|
+| vpa | [ccvass/swarmex-vpa](https://github.com/ccvass/swarmex-vpa) | Vertical autoscaling (CPU/RAM right-sizing) |
+| traffic | [ccvass/swarmex-traffic](https://github.com/ccvass/swarmex-traffic) | Circuit breaker, retries, rate limiting |
+| federation | [ccvass/swarmex-federation](https://github.com/ccvass/swarmex-federation) | Multi-cluster replication across clouds |
+| api | [ccvass/swarmex-api](https://github.com/ccvass/swarmex-api) | Custom resource API with bbolt persistence |
+| cluster-scaler | [ccvass/swarmex-cluster-scaler](https://github.com/ccvass/swarmex-cluster-scaler) | Auto-provision/deprovision cloud nodes |
+
+### Phase 9 — Closing K8s Gaps
+
+| Controller | Repository | Description |
+|:---|:---|:---|
+| affinity | [ccvass/swarmex-affinity](https://github.com/ccvass/swarmex-affinity) | Service co-location and anti-affinity |
+| stateful | [ccvass/swarmex-stateful](https://github.com/ccvass/swarmex-stateful) | StatefulSets with ordered deploy + named volumes |
+| swarmex-pack | [ccvass/swarmex-pack](https://github.com/ccvass/swarmex-pack) | Helm-like CLI: template + values → deploy |
+
+### Platform Forks
+
 - **1** patched fork (Authentik — Attr dataclass fix)
 - **4** active forks as-is (swarm-cronjob, gantry, swarm-cd, EasyTier)
 - **4** active forks with improvements (SeaweedFS Swarm, SeaweedFS volume plugin, Portainer CE, Swarmpit)
