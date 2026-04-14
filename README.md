@@ -427,4 +427,4 @@ Apache-2.0
 
 ## Maintainer
 
-Alfonso de la Guarda — [CCVASS](https://ccvass.com)
+Alfonso de la Guarda — [CCVASS](https://ccvass.biz)
