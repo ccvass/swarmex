@@ -277,7 +277,7 @@ All features were tested on a live AWS cluster, not in simulation:
 | Docker | 29.4.0 with Swarm mode |
 | DNS | `*.swarmex.apulab.info` via Cloudflare |
 | SSL | Let's Encrypt wildcard (Cloudflare DNS challenge) |
-| Registry | Self-hosted GitLab at `registry.labtau.com` |
+| Registry | Self-hosted GitLab container registry |
 | CI/CD | GitLab CI with kaniko (17 pipelines) |
 | Services | 37 running simultaneously on 3 nodes |
 | Uptime | Cluster survived remediation drain, controller restarts, and stress tests |
@@ -291,8 +291,8 @@ Cluster autoscaling was tested by generating CPU load (12 stress containers) —
 ### Automated Install (Recommended)
 
 ```bash
-git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
-cd swarmex-coordinator
+git clone https://github.com/ccvass/swarmex.git
+cd swarmex
 bash scripts/install.sh
 ```
 
@@ -302,14 +302,14 @@ The installer asks for your manager IP, domain, credentials, and optional cloud 
 
 ```bash
 # Clone
-git clone git@scovil.labtau.com:ccvass/swarmex/swarmex-coordinator.git
-cd swarmex-coordinator
+git clone https://github.com/ccvass/swarmex.git
+cd swarmex
 
 # Initialize Swarm (if not already)
 docker swarm init
 
 # Login to registry on ALL nodes
-echo "<token>" | docker login registry.labtau.com -u "gitlab+deploy-token-409" --password-stdin
+echo "<token>" | docker login <your-registry> -u "<user>" --password-stdin
 
 # Create Docker secrets
 echo -n "<db-password>" | docker secret create authentik_db_pw -
@@ -375,7 +375,7 @@ swarmex-coordinator/
 
 ## Repositories
 
-All source code on [GitHub](https://github.com/ccvass). CI/CD on GitLab (scovil.labtau.com) building container images via kaniko.
+All source code on [GitHub](https://github.com/ccvass). CI/CD pipelines build container images via kaniko.
 
 ### Core — Workload Management
 
