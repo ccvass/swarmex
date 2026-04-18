@@ -341,7 +341,8 @@ docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
 swarmex-coordinator/
 ├── README.md                  # This file
 ├── ROADMAP.md                 # Implementation phases
-├── STANDARDS.md               # Go 1.26, patterns, conventions
+├── docs/
+│   ├── STANDARDS.md            #   Go 1.26, patterns, conventions
 ├── stacks/                    # Docker Compose stacks
 │   ├── ingress.yml            #   Traefik + Let's Encrypt
 │   ├── observability.yml      #   Prometheus, Grafana, Loki, Tempo, Promtail
@@ -457,7 +458,7 @@ sequenceDiagram
 | [K8S-VS-SWARMEX.md](docs/K8S-VS-SWARMEX.md) | Feature-by-feature comparison with Kubernetes (35+ features) |
 | [FORK-STATUS.md](docs/FORK-STATUS.md) | Fork analysis, what was changed, upstream PR status |
 | [ROADMAP.md](ROADMAP.md) | Implementation phases and OSS resource mapping |
-| [STANDARDS.md](STANDARDS.md) | Go 1.26, project patterns, deploy conventions |
+| [STANDARDS.md](docs/STANDARDS.md) | Go 1.26, project patterns, deploy conventions |
 | [configs/LABELS.md](configs/LABELS.md) | Complete `swarmex.*` label reference |
 
 ## License

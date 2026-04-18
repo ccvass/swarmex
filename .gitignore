@@ -96,3 +96,8 @@ swarmex-federation/
 swarmex-traffic/
 swarmex-api/
 swarmex-cluster-scaler/
+
+# Reference docs
+reference/
+todo.json
+todo
