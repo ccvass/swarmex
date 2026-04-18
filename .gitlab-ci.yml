@@ -1,0 +1,14 @@
+stages:
+  - build
+
+build-authentik:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"registry.labtau.com\":{\"username\":\"gitlab+deploy-token-409\",\"password\":\"gldt-zzCjmxDyJxHqaf_BzW7C\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR/docker/authentik --dockerfile $CI_PROJECT_DIR/docker/authentik/Dockerfile --destination registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest --destination registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:2024.8.3
+  only:
+    - main

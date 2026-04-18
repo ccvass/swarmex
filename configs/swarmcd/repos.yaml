@@ -1,0 +1,8 @@
+# SwarmCD Repositories
+# Add git repos here for GitOps deployments
+# Example:
+# my-app:
+#   url: "https://git.example.com/org/my-app.git"
+#   auth:
+#     username: "deploy"
+#     password_env: "GIT_TOKEN"
