@@ -1,37 +1,48 @@
 version: "3.8"
 
 # Ingress stack for Swarmex using Traefik-XPX
-# Deploy: ACME_EMAIL=admin@example.com docker stack deploy -c stacks/ingress.yml ingress
+# Compatible with legacy Traefik 2.x label patterns (constraint-label, https-redirect)
+#
+# Deploy:
+#   ACME_EMAIL=admin@example.com docker stack deploy -c stacks/ingress.yml ingress
 #
 # Prerequisites:
-#   - Docker secret 'cloudflare_api_token' (for DNS challenge SSL)
-#   - Shared mount directories on all manager nodes:
-#       mkdir -p /mnt/traefik/{certificates,config,logs,valkey}
-#   - Dynamic config file at /mnt/traefik/config/dynamic.yml (optional)
+#   - Docker secret 'cloudflare_api_token'
+#   - Shared mount on manager nodes:
+#       mkdir -p /mnt/traefik/{certs,logs,fileprovider,valkey}
+#   - Optional: /mnt/traefik/fileprovider/dynamic.yml for TLS options
 
 services:
   traefik:
     image: ghcr.io/ccvass/traefik-xpx:latest
     command:
+      # Providers
       - --providers.swarm.endpoint=unix:///var/run/docker.sock
       - --providers.swarm.exposedByDefault=false
-      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.swarm.constraints=Label(`traefik.constraint-label`, `traefik-public`)
+      - --providers.file.filename=/fileprovider/dynamic.yml
       - --providers.file.watch=true
+      # Entrypoints (legacy-compatible names: http, https)
       - --entrypoints.http.address=:80
       - --entrypoints.https.address=:443
       - --entrypoints.traefik.address=:8099
-      - --api.dashboard=true
-      - --api.valkeyUrl=valkey://valkey:6379
+      # ACME / Let's Encrypt via Cloudflare DNS challenge
       - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@example.com}
       - --certificatesresolvers.le.acme.storage=/certificates/acme.json
       - --certificatesresolvers.le.acme.dnschallenge=true
       - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=0
       - --certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+      # API / Dashboard
+      - --api.dashboard=true
+      - --api.valkeyUrl=valkey://valkey:6379
+      # Observability
       - --metrics.prometheus=true
       - --ping.entryPoint=http
       - --accesslog
       - --log.filepath=/var/log/traefik/traefik.log
       - --log.level=INFO
+      - --serversTransport.insecureSkipVerify=true
     ports:
       - target: 80
         published: 80
@@ -51,9 +62,11 @@ services:
       - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_api_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${TRAEFIK_DATA:-/mnt/traefik}/certificates:/certificates
-      - ${TRAEFIK_DATA:-/mnt/traefik}/config:/etc/traefik
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ${TRAEFIK_DATA:-/mnt/traefik}/certs:/certificates
       - ${TRAEFIK_DATA:-/mnt/traefik}/logs:/var/log/traefik
+      - ${TRAEFIK_DATA:-/mnt/traefik}/fileprovider:/fileprovider
     deploy:
       mode: global
       placement:
@@ -66,8 +79,20 @@ services:
         delay: 30s
         order: start-first
       labels:
-        team: platform
         traefik.enable: "true"
+        traefik.constraint-label: "traefik-public"
+        traefik.docker.network: "traefik-public"
+        # HTTPS redirect middleware (used by legacy services)
+        traefik.http.middlewares.https-redirect.redirectscheme.scheme: "https"
+        traefik.http.middlewares.https-redirect.redirectscheme.permanent: "true"
+        # Dashboard
+        traefik.http.routers.traefik-public.rule: "Host(`${TRAEFIK_DOMAIN:-traefik.example.com}`)"
+        traefik.http.routers.traefik-public.entrypoints: "https"
+        traefik.http.routers.traefik-public.tls: "true"
+        traefik.http.routers.traefik-public.tls.certresolver: "le"
+        traefik.http.routers.traefik-public.service: "api@internal"
+        traefik.http.services.traefik-public.loadbalancer.server.port: "8080"
+        team: platform
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
