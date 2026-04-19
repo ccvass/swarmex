@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 160" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="100%" stop-color="#00CCFF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagonal cluster icon -->
+  <g transform="translate(80, 70)">
+    <polygon points="0,-24 20.8,-12 20.8,12 0,24 -20.8,12 -20.8,-12" fill="url(#g1)"/>
+    <polygon points="0,-66 20.8,-54 20.8,-30 0,-18 -20.8,-30 -20.8,-54" fill="url(#g1)" opacity="0.7"/>
+    <polygon points="36.4,-42 57.2,-30 57.2,-6 36.4,6 15.6,-6 15.6,-30" fill="url(#g1)" opacity="0.6"/>
+    <polygon points="36.4,6 57.2,18 57.2,42 36.4,54 15.6,42 15.6,18" fill="url(#g1)" opacity="0.5"/>
+    <polygon points="0,18 20.8,30 20.8,54 0,66 -20.8,54 -20.8,30" fill="url(#g1)" opacity="0.7"/>
+    <polygon points="-36.4,6 -15.6,18 -15.6,42 -36.4,54 -57.2,42 -57.2,18" fill="url(#g1)" opacity="0.6"/>
+    <polygon points="-36.4,-42 -15.6,-30 -15.6,-6 -36.4,6 -57.2,-6 -57.2,-30" fill="url(#g1)" opacity="0.5"/>
+    <line x1="0" y1="-18" x2="0" y2="-24" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <line x1="15.6" y1="-6" x2="20.8" y2="-12" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <line x1="15.6" y1="18" x2="20.8" y2="12" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <line x1="0" y1="18" x2="0" y2="24" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <line x1="-15.6" y1="18" x2="-20.8" y2="12" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <line x1="-15.6" y1="-6" x2="-20.8" y2="-12" stroke="#00CCFF" stroke-width="1.5" opacity="0.8"/>
+    <circle cx="0" cy="0" r="4" fill="white"/>
+    <circle cx="0" cy="-42" r="3" fill="white" opacity="0.9"/>
+    <circle cx="36.4" cy="-18" r="3" fill="white" opacity="0.9"/>
+    <circle cx="36.4" cy="30" r="3" fill="white" opacity="0.9"/>
+    <circle cx="0" cy="42" r="3" fill="white" opacity="0.9"/>
+    <circle cx="-36.4" cy="30" r="3" fill="white" opacity="0.9"/>
+    <circle cx="-36.4" cy="-18" r="3" fill="white" opacity="0.9"/>
+  </g>
+
+  <!-- Text: SWARM in gradient, EX in dark -->
+  <text x="155" y="62" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" font-size="48" font-weight="700" fill="url(#g1)">SWARM</text>
+  <text x="335" y="62" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" font-size="48" font-weight="700" fill="#1F2937">EX</text>
+
+  <!-- Tagline -->
+  <text x="155" y="90" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#6B7280" letter-spacing="2">ENTERPRISE ORCHESTRATION</text>
+</svg>
