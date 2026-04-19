@@ -24,7 +24,7 @@ services:
           - node.role == manager
       labels:
         traefik.enable: "true"
-        traefik.http.routers.swarmpit.rule: "Host(`swarmpit.${DOMAIN:-localhost}`)"
+        traefik.http.routers.swarmpit.rule: "Host(`suleiman.puqaz.info`)"
         traefik.http.routers.swarmpit.tls.certresolver: "le"
         traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
         team: platform
