@@ -349,6 +349,7 @@ swarmex-coordinator/
 │   ├── security.yml           #   Authentik, OpenBao, PostgreSQL, Valkey
 │   ├── storage.yml            #   SeaweedFS (master, volume, filer)
 │   ├── tools.yml              #   Portainer, swarm-cd, swarm-cronjob, gantry
+│   ├── tools-swarmpit.yml     #   Swarmpit (alternative to Portainer)
 │   └── swarmex.yml            #   All 18 controllers
 ├── configs/                   # Service configurations
 │   ├── prometheus/            #   Scrape configs + alert rules
