@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/logo.svg" alt="Swarmex" width="400"></p>
+
 # Swarmex
 
 Enterprise-grade orchestration for Docker Swarm — closing every feature gap with Kubernetes via lightweight Go controllers configured through Docker labels.
