@@ -1,0 +1,182 @@
+version: '3.8'
+services:
+  authentik-server:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
+    command: server
+    environment:
+    - AUTHENTIK_REDIS__HOST=authentik-valkey
+    - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+    - AUTHENTIK_POSTGRESQL__USER=authentik
+    - AUTHENTIK_POSTGRESQL__NAME=authentik
+    secrets:
+    - authentik_secret
+    - authentik_db_pw
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.authentik.rule: Host(`auth.${DOMAIN:-localhost}`)
+        traefik.http.routers.authentik.tls.certresolver: le
+        traefik.http.services.authentik.loadbalancer.server.port: '9000'
+        team: platform
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test:
+      - CMD
+      - ak
+      - healthcheck
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    networks:
+    - security
+    - traefik-public
+    entrypoint:
+    - /bin/sh
+    - -c
+    - export AUTHENTIK_SECRET_KEY=$$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$$(cat
+      /run/secrets/authentik_db_pw) && exec /lifecycle/ak server
+  authentik-worker:
+    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
+    command: worker
+    environment:
+    - AUTHENTIK_REDIS__HOST=authentik-valkey
+    - AUTHENTIK_POSTGRESQL__HOST=authentik-db
+    - AUTHENTIK_POSTGRESQL__USER=authentik
+    - AUTHENTIK_POSTGRESQL__NAME=authentik
+    secrets:
+    - authentik_secret
+    - authentik_db_pw
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 1G
+    networks:
+    - security
+    entrypoint:
+    - /bin/sh
+    - -c
+    - export AUTHENTIK_SECRET_KEY=$$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$$(cat
+      /run/secrets/authentik_db_pw) && exec /lifecycle/ak worker
+  authentik-db:
+    image: postgres:18-alpine
+    environment:
+    - POSTGRES_USER=authentik
+    - POSTGRES_DB=authentik
+    - POSTGRES_PASSWORD_FILE=/run/secrets/authentik_db_pw
+    secrets:
+    - authentik_db_pw
+    volumes:
+    - authentik_db_data:/var/lib/postgresql/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U authentik
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+    - security
+  authentik-valkey:
+    image: valkey/valkey:8-alpine
+    volumes:
+    - authentik_redis_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 120s
+    networks:
+    - security
+  openbao:
+    image: openbao/openbao:latest
+    entrypoint: /bin/sh
+    command:
+    - -c
+    - 'chown -R openbao:openbao /bao/data 2>/dev/null || true
+
+      exec bao server -config=/bao/config/config.hcl
+
+      '
+    environment:
+    - BAO_ADDR=http://127.0.0.1:8200
+    volumes:
+    - openbao_data:/bao/data
+    configs:
+    - source: openbao_config
+      target: /bao/config/config.hcl
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+        - node.role == manager
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.openbao.rule: Host(`vault.${DOMAIN:-localhost}`)
+        traefik.http.routers.openbao.tls.certresolver: le
+        traefik.http.services.openbao.loadbalancer.server.port: '8200'
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -qO- http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true
+        2>/dev/null || curl -sf http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedok=true&uninitok=true
+        2>/dev/null || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    cap_add:
+    - IPC_LOCK
+    networks:
+    - security
+    - traefik-public
+configs:
+  openbao_config:
+    file: ../configs/openbao/config.hcl
+volumes:
+  authentik_db_data: null
+  authentik_redis_data: null
+  openbao_data: null
+secrets:
+  authentik_secret:
+    external: true
+  authentik_db_pw:
+    external: true
+networks:
+  security:
+    external: true
+  traefik-public:
+    external: true

@@ -1,0 +1,162 @@
+version: '3.8'
+
+# Alternative tools stack using Swarmpit instead of Portainer
+# Usage: docker stack deploy -c stacks/tools-swarmpit.yml --with-registry-auth tools
+
+configs:
+  swarmcd_repos:
+    file: ../configs/swarmcd/repos.yaml
+  swarmcd_stacks:
+    file: ../configs/swarmcd/stacks.yaml
+
+services:
+  swarmpit:
+    image: ghcr.io/ccvass/swarmpit:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - SWARMPIT_DB=http://swarmpit-db:5984
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.swarmpit.rule: "Host(`swarmpit.${DOMAIN:-localhost}`)"
+        traefik.http.routers.swarmpit.tls.certresolver: "le"
+        traefik.http.services.swarmpit.loadbalancer.server.port: "8080"
+        team: platform
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - traefik-public
+      - swarmpit-internal
+
+  swarmpit-db:
+    image: couchdb:2.3.1
+    volumes:
+      - swarmpit_db:/opt/couchdb/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - swarmpit-internal
+
+  swarmpit-agent:
+    image: swarmpit/agent:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOCKER_API_VERSION=1.35
+      - EVENT_ENDPOINT=http://swarmpit:8080/events
+      - HEALTH_CHECK_ENDPOINT=http://swarmpit:8080/version
+    deploy:
+      mode: global
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - swarmpit-internal
+
+  swarmpit-influxdb:
+    image: influxdb:1.8.9
+    volumes:
+      - swarmpit_influx:/var/lib/influxdb
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - swarmpit-internal
+
+  swarm-cd:
+    image: ghcr.io/m-adawi/swarm-cd:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    configs:
+      - source: swarmcd_repos
+        target: /app/repos.yaml
+      - source: swarmcd_stacks
+        target: /app/stacks.yaml
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        traefik.enable: "true"
+        traefik.http.routers.swarmcd.rule: "Host(`cd.${DOMAIN:-localhost}`)"
+        traefik.http.routers.swarmcd.tls.certresolver: "le"
+        traefik.http.services.swarmcd.loadbalancer.server.port: "8080"
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - traefik-public
+
+  swarm-cronjob:
+    image: crazymax/swarm-cronjob:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LOG_LEVEL=info
+      - LOG_JSON=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+
+  gantry:
+    image: shizunge/gantry:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - GANTRY_SLEEP_SECONDS=300
+      - GANTRY_LOG_LEVEL=INFO
+      - GANTRY_LOG_FORMAT=json
+      - GANTRY_CLEANUP_IMAGES=true
+      - GANTRY_ROLLBACK_ON_FAILURE=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        gantry.services.excluded: "true"
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  swarmpit_db:
+  swarmpit_influx:
+
+networks:
+  traefik-public:
+    external: true
+  swarmpit-internal:

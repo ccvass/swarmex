@@ -1,0 +1,101 @@
+version: '3.8'
+configs:
+  swarmcd_repos:
+    file: ../configs/swarmcd/repos.yaml
+  swarmcd_stacks:
+    file: ../configs/swarmcd/stacks.yaml
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: -H unix:///var/run/docker.sock
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    - portainer_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+        - node.role == manager
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.portainer.rule: Host(`portainer.${DOMAIN:-localhost}`)
+        traefik.http.routers.portainer.tls.certresolver: le
+        traefik.http.services.portainer.loadbalancer.server.port: '9000'
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+    networks:
+    - traefik-public
+  swarm-cd:
+    image: ghcr.io/m-adawi/swarm-cd:latest
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    configs:
+    - source: swarmcd_repos
+      target: /app/repos.yaml
+    - source: swarmcd_stacks
+      target: /app/stacks.yaml
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+        - node.role == manager
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.swarmcd.rule: Host(`cd.${DOMAIN:-localhost}`)
+        traefik.http.routers.swarmcd.tls.certresolver: le
+        traefik.http.services.swarmcd.loadbalancer.server.port: '8080'
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+    networks:
+    - traefik-public
+  swarm-cronjob:
+    image: crazymax/swarm-cronjob:latest
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+    - LOG_LEVEL=info
+    - LOG_JSON=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+        - node.role == manager
+      labels:
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+  gantry:
+    image: shizunge/gantry:latest
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+    - GANTRY_SLEEP_SECONDS=300
+    - GANTRY_LOG_LEVEL=INFO
+    - GANTRY_LOG_FORMAT=json
+    - GANTRY_CLEANUP_IMAGES=true
+    - GANTRY_ROLLBACK_ON_FAILURE=true
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+        - node.role == manager
+      labels:
+        gantry.services.excluded: 'true'
+        team: platform
+      resources:
+        limits:
+          memory: 256M
+volumes:
+  portainer_data: null
+networks:
+  traefik-public:
+    external: true

@@ -1,0 +1,166 @@
+version: "3.8"
+
+# Swarmex controllers stack — all 16 controllers
+# Deploy: docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex
+# Requires: observability, ingress, security stacks deployed first
+
+x-defaults: &defaults
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+  deploy:
+    mode: replicated
+    replicas: 1
+    placement:
+      constraints: [node.role == manager]
+    resources:
+      limits:
+        memory: 128M
+    labels:
+      team: platform
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 60s
+  networks:
+    - swarmex
+
+services:
+  # === Core (8) ===
+  event-controller:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-event-controller:latest
+
+  scaler:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-scaler:latest
+    environment:
+      - PROMETHEUS_URL=http://observability_prometheus:9090
+    networks:
+      - swarmex
+      - monitoring
+
+  gatekeeper:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-gatekeeper:latest
+    networks:
+      - swarmex
+      - traefik-public
+
+  remediation:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-remediation:latest
+    networks:
+      - swarmex
+      - monitoring
+
+  deployer:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-deployer:latest
+    environment:
+      - PROMETHEUS_URL=http://observability_prometheus:9090
+    networks:
+      - swarmex
+      - monitoring
+      - traefik-public
+
+  vault-sync:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-vault-sync:latest
+    environment:
+      - VAULT_ADDR=http://openbao:8200
+      - VAULT_TOKEN_FILE=/run/secrets/openbao_root_token
+    secrets:
+      - openbao_root_token
+    networks:
+      - swarmex
+      - security
+
+  operator-db:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-operator-db:latest
+
+  nano-mesh:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-nano-mesh:latest
+
+  # === Governance (4) ===
+  namespaces:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-namespaces:latest
+
+  netpolicy:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-netpolicy:latest
+
+  rbac:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-rbac:latest
+
+  admission:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-admission:latest
+    configs:
+      - source: admission-rules
+        target: /etc/swarmex/admission.yaml
+    environment:
+      - ADMISSION_CONFIG=/etc/swarmex/admission.yaml
+
+  # === Advanced (4) ===
+  vpa:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-vpa:latest
+    environment:
+      - PROMETHEUS_URL=http://observability_prometheus:9090
+    networks:
+      - swarmex
+      - monitoring
+
+  traffic:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-traffic:latest
+    networks:
+      - swarmex
+      - traefik-public
+
+  federation:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-federation:latest
+
+  api:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-api:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - api-data:/data
+
+  # === Phase 9 (2) ===
+  affinity:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-affinity:latest
+
+  stateful:
+    <<: *defaults
+    image: ghcr.io/ccvass/swarmex-stateful:latest
+
+volumes:
+  api-data:
+
+configs:
+  admission-rules:
+    external: true
+
+secrets:
+  openbao_root_token:
+    external: true
+
+networks:
+  swarmex:
+    external: true
+  monitoring:
+    external: true
+  traefik-public:
+    external: true
+  security:
+    external: true

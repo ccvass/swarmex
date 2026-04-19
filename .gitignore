@@ -1,0 +1,103 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+REMOTE.md
+
+# AI agents & copilot
+AGENTS.md
+.github/copilot-instructions.md
+.github/copilot*.md
+.copilot/
+.kiro/
+.cursor/
+.aider*
+.continue/
+.cline/
+.roo/
+.windsurf/
+.augment*
+codex.md
+claude.md
+CLAUDE.md
+.claude/
+
+# Cloned repos (each is a separate git repo in the group)
+swarmex-event-controller/
+swarmex-scaler/
+swarmex-gatekeeper/
+swarmex-operator-db/
+swarmex-vault-sync/
+swarmex-nano-mesh/
+swarmex-remediation/
+swarmex-deployer/
+swarm-monitoring/
+promswarm/
+portainer-ce/
+swarm-autoscaler/
+swarm-cronjob/
+gantry/
+seaweedfs-swarm/
+seaweedfs-volume-plugin/
+swarm-cd/
+swarm-sync/
+swarmpit/
+coolify/
+hca/
+easytier/
+
+# Go
+/vendor/
+*.exe
+*.test
+*.out
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+build/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs & temp
+*.log
+tmp/
+.cache/
+*.tmp
+*.bak
+*.orig
+
+# Docker (local)
+docker-compose.override.yml
+
+# Databases (local)
+*.sqlite3
+*.db
+.playwright-mcp/
+swarmex-namespaces/
+swarmex-netpolicy/
+swarmex-rbac/
+swarmex-admission/
+swarmex-vpa/
+swarmex-federation/
+swarmex-traffic/
+swarmex-api/
+swarmex-cluster-scaler/
+
+# Reference docs
+reference/
+todo.json
+todo

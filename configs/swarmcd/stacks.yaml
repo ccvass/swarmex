@@ -1,0 +1,7 @@
+# SwarmCD Stacks
+# Define stacks to deploy from repos
+# Example:
+# my-app:
+#   repo: my-app
+#   branch: main
+#   compose_file: docker-compose.yml
