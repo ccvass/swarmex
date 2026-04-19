@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/assets/logo.svg" alt="Swarmex" width="400"></p>
 
-[![Test, Build & Deploy](https://github.com/ccvass/swarmex/actions/workflows/publish.yml/badge.svg)](https://github.com/ccvass/swarmex/actions/workflows/publish.yml)
+[![Test, Build & Deploy](https://github.com/ccvass/swarmex/actions/workflows/ci.yml/badge.svg)](https://github.com/ccvass/swarmex/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 # Swarmex
