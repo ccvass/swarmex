@@ -461,7 +461,7 @@ sequenceDiagram
 | Document | Description |
 |:---|:---|
 | [USER-GUIDE.md](docs/USER-GUIDE.md) | How to deploy your app on Swarmex — all labels explained |
-| [K8S-VS-SWARMEX.md](docs/K8S-VS-SWARMEX.md) | Feature-by-feature comparison with Kubernetes (35+ features) |
+| [K8S-VS-SWARMEX.md](docs/K8S-VS-SWARMEX.md) | Feature-by-feature comparison with Kubernetes (38 features) |
 | [FORK-STATUS.md](docs/FORK-STATUS.md) | Fork analysis, what was changed, upstream PR status |
 | [ROADMAP.md](ROADMAP.md) | Implementation phases and OSS resource mapping |
 | [STANDARDS.md](docs/STANDARDS.md) | Go 1.26, project patterns, deploy conventions |
