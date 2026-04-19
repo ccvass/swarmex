@@ -14,7 +14,7 @@ version: "3.8"
 
 services:
   traefik:
-    image: traefik:latest
+    image: alfonsodg/traefik-xp:latest
     command:
       - "--api.dashboard=true"
       - "--providers.swarm=true"

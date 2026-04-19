@@ -30,11 +30,11 @@ services:
   # === Core (8) ===
   event-controller:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-event-controller:latest
+    image: ghcr.io/ccvass/swarmex-event-controller:latest
 
   scaler:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-scaler:latest
+    image: ghcr.io/ccvass/swarmex-scaler:latest
     environment:
       - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
@@ -43,21 +43,21 @@ services:
 
   gatekeeper:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-gatekeeper:latest
+    image: ghcr.io/ccvass/swarmex-gatekeeper:latest
     networks:
       - swarmex
       - traefik-public
 
   remediation:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-remediation:latest
+    image: ghcr.io/ccvass/swarmex-remediation:latest
     networks:
       - swarmex
       - monitoring
 
   deployer:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-deployer:latest
+    image: ghcr.io/ccvass/swarmex-deployer:latest
     environment:
       - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
@@ -67,7 +67,7 @@ services:
 
   vault-sync:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-vault-sync:latest
+    image: ghcr.io/ccvass/swarmex-vault-sync:latest
     environment:
       - VAULT_ADDR=http://openbao:8200
       - VAULT_TOKEN_FILE=/run/secrets/openbao_root_token
@@ -79,28 +79,28 @@ services:
 
   operator-db:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-operator-db:latest
+    image: ghcr.io/ccvass/swarmex-operator-db:latest
 
   nano-mesh:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-nano-mesh:latest
+    image: ghcr.io/ccvass/swarmex-nano-mesh:latest
 
   # === Governance (4) ===
   namespaces:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-namespaces:latest
+    image: ghcr.io/ccvass/swarmex-namespaces:latest
 
   netpolicy:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-netpolicy:latest
+    image: ghcr.io/ccvass/swarmex-netpolicy:latest
 
   rbac:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-rbac:latest
+    image: ghcr.io/ccvass/swarmex-rbac:latest
 
   admission:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-admission:latest
+    image: ghcr.io/ccvass/swarmex-admission:latest
     configs:
       - source: admission-rules
         target: /etc/swarmex/admission.yaml
@@ -110,7 +110,7 @@ services:
   # === Advanced (4) ===
   vpa:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-vpa:latest
+    image: ghcr.io/ccvass/swarmex-vpa:latest
     environment:
       - PROMETHEUS_URL=http://observability_prometheus:9090
     networks:
@@ -119,18 +119,18 @@ services:
 
   traffic:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-traffic:latest
+    image: ghcr.io/ccvass/swarmex-traffic:latest
     networks:
       - swarmex
       - traefik-public
 
   federation:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-federation:latest
+    image: ghcr.io/ccvass/swarmex-federation:latest
 
   api:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-api:latest
+    image: ghcr.io/ccvass/swarmex-api:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - api-data:/data
@@ -138,11 +138,11 @@ services:
   # === Phase 9 (2) ===
   affinity:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-affinity:latest
+    image: ghcr.io/ccvass/swarmex-affinity:latest
 
   stateful:
     <<: *defaults
-    image: registry.labtau.com/ccvass/swarmex/swarmex-stateful:latest
+    image: ghcr.io/ccvass/swarmex-stateful:latest
 
 volumes:
   api-data:
