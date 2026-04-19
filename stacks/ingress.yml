@@ -1,39 +1,34 @@
 version: "3.8"
 
-# Ingress stack for Swarmex
+# Ingress stack for Swarmex using Traefik-XPX
 # Deploy: docker stack deploy -c stacks/ingress.yml ingress
 #
-# HA: Traefik runs on ALL nodes (mode: global) with Docker Swarm
-# routing mesh. If any node dies, traffic routes to surviving nodes.
-#
-# SSL: Cloudflare DNS challenge for wildcard certs (*.domain.com).
-# Set CLOUDFLARE_DNS_API_TOKEN in Docker secret before deploying.
-#
-# Multiple domains: Add more SANs to the certificate resolver or
-# create additional routers with different Host() rules.
+# Requires: /mnt/traefik-xpx/{certificates,config,logs} on manager nodes
+# Requires: Docker secret 'cloudflare_api_token' (for DNS challenge SSL)
 
 services:
   traefik:
     image: ghcr.io/ccvass/traefik-xpx:latest
     command:
-      - "--api.dashboard=true"
-      - "--providers.swarm=true"
-      - "--providers.swarm.exposedByDefault=false"
-      # Entrypoints
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
-      # Let's Encrypt with Cloudflare DNS challenge (supports wildcards)
-      - "--certificatesresolvers.le.acme.dnschallenge=true"
-      - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
-      - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53"
-      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@example.com}"
-      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
-      # Metrics and health
-      - "--metrics.prometheus=true"
-      - "--ping=true"
-      - "--log.level=INFO"
-      - "--accesslog=true"
+      - --providers.swarm.endpoint=unix:///var/run/docker.sock
+      - --providers.swarm.exposedByDefault=false
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --providers.file.watch=true
+      - --entrypoints.http.address=:80
+      - --entrypoints.https.address=:443
+      - --entrypoints.traefik.address=:8099
+      - --api.dashboard=true
+      - --api.valkeyUrl=valkey://valkey:6379
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@example.com}
+      - --certificatesresolvers.le.acme.storage=/certificates/acme.json
+      - --certificatesresolvers.le.acme.dnschallenge=true
+      - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+      - --metrics.prometheus=true
+      - --ping.entryPoint=http
+      - --accesslog
+      - --log.filepath=/var/log/traefik/traefik.log
+      - --log.level=INFO
     ports:
       - target: 80
         published: 80
@@ -43,21 +38,26 @@ services:
         published: 443
         protocol: tcp
         mode: ingress
+      - target: 8099
+        published: 8099
+        protocol: tcp
+        mode: ingress
     secrets:
       - cloudflare_api_token
     environment:
       - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_api_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_certs:/letsencrypt
+      - /mnt/traefik-xpx/certificates:/certificates
+      - /mnt/traefik-xpx/config:/etc/traefik
+      - /mnt/traefik-xpx/logs:/var/log/traefik
     deploy:
-      mode: replicated
-      replicas: 1
+      mode: global
       placement:
         constraints: [node.role == manager]
       resources:
         limits:
-          memory: 256M
+          memory: 512M
       update_config:
         parallelism: 1
         delay: 30s
@@ -65,24 +65,32 @@ services:
       labels:
         team: platform
         traefik.enable: "true"
-        traefik.http.routers.dashboard.rule: "Host(`traefik.${DOMAIN:-localhost}`)"
-        traefik.http.routers.dashboard.service: "api@internal"
-        traefik.http.routers.dashboard.tls.certresolver: "le"
-        traefik.http.routers.dashboard.middlewares: "auth"
-        traefik.http.middlewares.auth.forwardauth.address: "http://authentik:9000/outpost.goauthentik.io/auth/traefik"
-        traefik.http.services.dashboard.loadbalancer.server.port: "8080"
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
       timeout: 3s
       retries: 3
-    start_period: 60s
+      start_period: 60s
     networks:
       - traefik-public
       - monitoring
 
-volumes:
-  traefik_certs:
+  valkey:
+    image: valkey/valkey:9-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - /mnt/traefik-xpx/valkey:/data
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          memory: 256M
+      labels:
+        team: platform
+    networks:
+      - traefik-public
 
 secrets:
   cloudflare_api_token:
