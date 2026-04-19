@@ -1,48 +1,28 @@
 version: "3.8"
 
 # Ingress stack for Swarmex using Traefik-XPX
-# Compatible with legacy Traefik 2.x label patterns (constraint-label, https-redirect)
+# Compatible with legacy Traefik 2.x label patterns
 #
 # Deploy:
-#   ACME_EMAIL=admin@example.com docker stack deploy -c stacks/ingress.yml ingress
+#   CF_API_EMAIL=you@example.com CF_API_KEY=your-key \
+#   docker stack deploy -c stacks/ingress.yml traefik
 #
 # Prerequisites:
-#   - Docker secret 'cloudflare_api_token'
-#   - Shared mount on manager nodes:
-#       mkdir -p /mnt/traefik/{certs,logs,fileprovider,valkey}
-#   - Optional: /mnt/traefik/fileprovider/dynamic.yml for TLS options
+#   - Shared mount on manager nodes with:
+#       /mnt/traefik/certs/          (acme.json — auto-generated)
+#       /mnt/traefik/logs/           (traefik.log)
+#       /mnt/traefik/fileprovider/   (dynamic.yml — TLS options)
+#       /mnt/traefik/traefik-xp.yml  (main config file)
+#       /mnt/traefik/users.json      (dashboard auth users)
 
 services:
   traefik:
     image: ghcr.io/ccvass/traefik-xpx:latest
     command:
-      # Providers
-      - --providers.swarm.endpoint=unix:///var/run/docker.sock
-      - --providers.swarm.exposedByDefault=false
-      - --providers.swarm.constraints=Label(`traefik.constraint-label`, `traefik-public`)
-      - --providers.file.filename=/fileprovider/dynamic.yml
-      - --providers.file.watch=true
-      # Entrypoints (legacy-compatible names: http, https)
-      - --entrypoints.http.address=:80
-      - --entrypoints.https.address=:443
-      - --entrypoints.traefik.address=:8099
-      # ACME / Let's Encrypt via Cloudflare DNS challenge
-      - --certificatesresolvers.le.acme.email=${ACME_EMAIL:-admin@example.com}
-      - --certificatesresolvers.le.acme.storage=/certificates/acme.json
-      - --certificatesresolvers.le.acme.dnschallenge=true
-      - --certificatesresolvers.le.acme.dnschallenge.provider=cloudflare
-      - --certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=0
-      - --certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
-      # API / Dashboard
-      - --api.dashboard=true
-      - --api.valkeyUrl=valkey://valkey:6379
-      # Observability
-      - --metrics.prometheus=true
-      - --ping.entryPoint=http
-      - --accesslog
-      - --log.filepath=/var/log/traefik/traefik.log
-      - --log.level=INFO
-      - --serversTransport.insecureSkipVerify=true
+      - --configFile=/etc/traefik/traefik.yml
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL:-admin@example.com}
+      - CF_API_KEY=${CF_API_KEY:-changeme}
     ports:
       - target: 80
         published: 80
@@ -56,76 +36,47 @@ services:
         published: 8099
         protocol: tcp
         mode: ingress
-    secrets:
-      - cloudflare_api_token
-    environment:
-      - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_api_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
       - ${TRAEFIK_DATA:-/mnt/traefik}/certs:/certificates
-      - ${TRAEFIK_DATA:-/mnt/traefik}/logs:/var/log/traefik
+      - ${TRAEFIK_DATA:-/mnt/traefik}/logs:/var/log
       - ${TRAEFIK_DATA:-/mnt/traefik}/fileprovider:/fileprovider
+      - ${TRAEFIK_DATA:-/mnt/traefik}/traefik-xp.yml:/etc/traefik/traefik.yml
+      - ${TRAEFIK_DATA:-/mnt/traefik}/users.json:/etc/traefik/users.json
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints: [node.role == manager]
+        preferences:
+          - spread: node.id
       resources:
         limits:
           memory: 512M
       update_config:
         parallelism: 1
-        delay: 30s
-        order: start-first
+        order: stop-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
       labels:
         traefik.enable: "true"
         traefik.constraint-label: "traefik-public"
         traefik.docker.network: "traefik-public"
-        # HTTPS redirect middleware (used by legacy services)
         traefik.http.middlewares.https-redirect.redirectscheme.scheme: "https"
-        traefik.http.middlewares.https-redirect.redirectscheme.permanent: "true"
-        # Dashboard
         traefik.http.routers.traefik-public.rule: "Host(`${TRAEFIK_DOMAIN:-traefik.example.com}`)"
-        traefik.http.routers.traefik-public.entrypoints: "https"
+        traefik.http.routers.traefik-public.service: "api@internal"
         traefik.http.routers.traefik-public.tls: "true"
         traefik.http.routers.traefik-public.tls.certresolver: "le"
-        traefik.http.routers.traefik-public.service: "api@internal"
         traefik.http.services.traefik-public.loadbalancer.server.port: "8080"
         team: platform
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck", "--ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 60s
+    logging:
+      driver: json-file
     networks:
       - traefik-public
-      - monitoring
-
-  valkey:
-    image: valkey/valkey:9-alpine
-    command: valkey-server --appendonly yes
-    volumes:
-      - ${TRAEFIK_DATA:-/mnt/traefik}/valkey:/data
-    deploy:
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-      resources:
-        limits:
-          memory: 256M
-      labels:
-        team: platform
-    networks:
-      - traefik-public
-
-secrets:
-  cloudflare_api_token:
-    external: true
 
 networks:
   traefik-public:
-    external: true
-  monitoring:
     external: true
