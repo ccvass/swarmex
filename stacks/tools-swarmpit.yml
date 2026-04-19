@@ -1,6 +1,12 @@
 version: '3.8'
 
 # Tools stack using Swarmpit XPX (embedded SQLite, no external DB)
+# Deploy: docker stack deploy -c stacks/tools-swarmpit.yml tools
+#
+# Prerequisites:
+#   - Shared mount directory on manager nodes:
+#       mkdir -p /mnt/swarmpit
+#   - Traefik running with 'traefik-public' network
 
 configs:
   swarmcd_repos:
@@ -13,7 +19,7 @@ services:
     image: ghcr.io/ccvass/swarmpit-xpx:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /mnt/swarmpit-xpx:/app/data
+      - ${SWARMPIT_DATA:-/mnt/swarmpit}:/app/data
     deploy:
       mode: replicated
       replicas: 1
@@ -24,10 +30,10 @@ services:
         traefik.enable: "true"
         traefik.docker.network: "traefik-public"
         traefik.constraint-label: "traefik-public"
-        traefik.http.routers.swarmpit-http.rule: "Host(`suleiman.puqaz.info`)"
+        traefik.http.routers.swarmpit-http.rule: "Host(`${SWARMPIT_DOMAIN:-swarmpit.example.com}`)"
         traefik.http.routers.swarmpit-http.entrypoints: "http"
         traefik.http.routers.swarmpit-http.middlewares: "https-redirect"
-        traefik.http.routers.swarmpit-https.rule: "Host(`suleiman.puqaz.info`)"
+        traefik.http.routers.swarmpit-https.rule: "Host(`${SWARMPIT_DOMAIN:-swarmpit.example.com}`)"
         traefik.http.routers.swarmpit-https.entrypoints: "https"
         traefik.http.routers.swarmpit-https.tls: "true"
         traefik.http.routers.swarmpit-https.tls.certresolver: "le"

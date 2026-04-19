@@ -1,10 +1,13 @@
 version: "3.8"
 
 # Ingress stack for Swarmex using Traefik-XPX
-# Deploy: docker stack deploy -c stacks/ingress.yml ingress
+# Deploy: ACME_EMAIL=admin@example.com docker stack deploy -c stacks/ingress.yml ingress
 #
-# Requires: /mnt/traefik-xpx/{certificates,config,logs} on manager nodes
-# Requires: Docker secret 'cloudflare_api_token' (for DNS challenge SSL)
+# Prerequisites:
+#   - Docker secret 'cloudflare_api_token' (for DNS challenge SSL)
+#   - Shared mount directories on all manager nodes:
+#       mkdir -p /mnt/traefik/{certificates,config,logs,valkey}
+#   - Dynamic config file at /mnt/traefik/config/dynamic.yml (optional)
 
 services:
   traefik:
@@ -48,9 +51,9 @@ services:
       - CF_DNS_API_TOKEN_FILE=/run/secrets/cloudflare_api_token
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /mnt/traefik-xpx/certificates:/certificates
-      - /mnt/traefik-xpx/config:/etc/traefik
-      - /mnt/traefik-xpx/logs:/var/log/traefik
+      - ${TRAEFIK_DATA:-/mnt/traefik}/certificates:/certificates
+      - ${TRAEFIK_DATA:-/mnt/traefik}/config:/etc/traefik
+      - ${TRAEFIK_DATA:-/mnt/traefik}/logs:/var/log/traefik
     deploy:
       mode: global
       placement:
@@ -79,7 +82,7 @@ services:
     image: valkey/valkey:9-alpine
     command: valkey-server --appendonly yes
     volumes:
-      - /mnt/traefik-xpx/valkey:/data
+      - ${TRAEFIK_DATA:-/mnt/traefik}/valkey:/data
     deploy:
       replicas: 1
       placement:
