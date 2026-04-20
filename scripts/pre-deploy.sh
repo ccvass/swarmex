@@ -66,3 +66,9 @@ echo "  3. docker stack deploy -c stacks/security.yml --with-registry-auth secur
 echo "  4. docker stack deploy -c stacks/storage.yml --with-registry-auth storage"
 echo "  5. docker stack deploy -c stacks/tools.yml --with-registry-auth tools"
 echo "  6. docker stack deploy -c stacks/swarmex.yml --with-registry-auth swarmex"
+
+echo ""
+echo "Optional: Set up shared storage on EVERY node:"
+echo "  bash scripts/setup-seaweedfs-mount.sh"
+echo ""
+echo "This creates /mnt/swarmex backed by SeaweedFS for service persistence."
