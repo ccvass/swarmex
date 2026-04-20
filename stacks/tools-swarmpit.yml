@@ -19,7 +19,7 @@ services:
     image: ghcr.io/ccvass/swarmpit-xpx:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${SWARMPIT_DATA:-/data/swarmex/swarmpit}:/app/data
+      - ${SWARMPIT_DATA:-/mnt/swarmpit-xpx}:/app/data
     deploy:
       mode: replicated
       replicas: 1
