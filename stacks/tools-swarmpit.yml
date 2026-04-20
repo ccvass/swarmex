@@ -5,7 +5,7 @@ version: '3.8'
 #
 # Prerequisites:
 #   - Shared mount directory on manager nodes:
-#       mkdir -p /mnt/swarmpit
+#       mkdir -p /data/swarmex/swarmpit
 #   - Traefik running with 'traefik-public' network
 
 configs:
@@ -19,7 +19,7 @@ services:
     image: ghcr.io/ccvass/swarmpit-xpx:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ${SWARMPIT_DATA:-/mnt/swarmex/swarmpit}:/app/data
+      - ${SWARMPIT_DATA:-/data/swarmex/swarmpit}:/app/data
     deploy:
       mode: replicated
       replicas: 1

@@ -9,11 +9,11 @@ version: "3.8"
 #
 # Prerequisites:
 #   - Shared mount on manager nodes with:
-#       /mnt/traefik/certs/          (acme.json — auto-generated)
-#       /mnt/traefik/logs/           (traefik.log)
-#       /mnt/traefik/fileprovider/   (dynamic.yml — TLS options)
-#       /mnt/traefik/traefik-xp.yml  (main config file)
-#       /mnt/traefik/users.json      (dashboard auth users)
+#       /data/swarmex/traefik/certs/          (acme.json — auto-generated)
+#       /data/swarmex/traefik/logs/           (traefik.log)
+#       /data/swarmex/traefik/fileprovider/   (dynamic.yml — TLS options)
+#       /data/swarmex/traefik/traefik-xp.yml  (main config file)
+#       /data/swarmex/traefik/users.json      (dashboard auth users)
 
 services:
   traefik:
@@ -40,11 +40,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - ${TRAEFIK_DATA:-/mnt/traefik}/certs:/certificates
-      - ${TRAEFIK_DATA:-/mnt/traefik}/logs:/var/log
-      - ${TRAEFIK_DATA:-/mnt/traefik}/fileprovider:/fileprovider
-      - ${TRAEFIK_DATA:-/mnt/traefik}/traefik-xp.yml:/etc/traefik/traefik.yml
-      - ${TRAEFIK_DATA:-/mnt/traefik}/users.json:/etc/traefik/users.json
+      - ${TRAEFIK_DATA:-/data/swarmex/traefik}/certs:/certificates
+      - ${TRAEFIK_DATA:-/data/swarmex/traefik}/logs:/var/log
+      - ${TRAEFIK_DATA:-/data/swarmex/traefik}/fileprovider:/fileprovider
+      - ${TRAEFIK_DATA:-/data/swarmex/traefik}/traefik-xp.yml:/etc/traefik/traefik.yml
+      - ${TRAEFIK_DATA:-/data/swarmex/traefik}/users.json:/etc/traefik/users.json
     deploy:
       mode: replicated
       replicas: 1
