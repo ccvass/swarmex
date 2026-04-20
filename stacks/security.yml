@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   authentik-server:
-    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
+    image: ghcr.io/goauthentik/server:latest
     command: server
     environment:
     - AUTHENTIK_REDIS__HOST=authentik-valkey
@@ -41,7 +41,7 @@ services:
     - export AUTHENTIK_SECRET_KEY=$$(cat /run/secrets/authentik_secret) && export AUTHENTIK_POSTGRESQL__PASSWORD=$$(cat
       /run/secrets/authentik_db_pw) && exec /lifecycle/ak server
   authentik-worker:
-    image: registry.labtau.com/ccvass/swarmex/swarmex-coordinator/authentik-patched:latest
+    image: ghcr.io/goauthentik/server:latest
     command: worker
     environment:
     - AUTHENTIK_REDIS__HOST=authentik-valkey

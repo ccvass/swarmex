@@ -101,3 +101,8 @@ swarmex-cluster-scaler/
 reference/
 todo.json
 todo
+
+# Production overrides (real paths, domains, secrets)
+stacks/prod/
+*.prod.yml
+deploy/
